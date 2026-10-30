@@ -68,138 +68,13 @@ func newLLMService() composeTypes.ServiceConfig {
 	}
 }
 
-func TestMakeAccessGatewayServiceAWS(t *testing.T) {
-	info := &client.AccountInfo{
-		Provider:  client.ProviderAWS,
-		Region:    "us-east-1",
-		AccountID: "123456789",
-	}
-
-	t.Run("chat-default model", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "bedrock/us.amazon.nova-2-lite-v1:0", "--alias", "chat-default"}, []string(svccfg.Command))
-		assert.Equal(t, "us-east-1", *svccfg.Environment["AWS_REGION"])
-	})
-
-	t.Run("embedding-default model", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "embedding-default", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "bedrock/amazon.titan-embed-text-v2:0", "--alias", "embedding-default"}, []string(svccfg.Command))
-	})
-
-	t.Run("custom model gets bedrock prefix", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "anthropic.claude-3-5-sonnet", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "bedrock/anthropic.claude-3-5-sonnet", "--alias", "anthropic.claude-3-5-sonnet"}, []string(svccfg.Command))
-	})
-
-	t.Run("model with existing provider prefix is not double-prefixed", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "bedrock/anthropic.claude-3-5-sonnet", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "bedrock/anthropic.claude-3-5-sonnet", "--alias", "bedrock/anthropic.claude-3-5-sonnet"}, []string(svccfg.Command))
-	})
-}
-
-func TestMakeAccessGatewayServiceGCP(t *testing.T) {
-	info := &client.AccountInfo{
-		Provider:  client.ProviderGCP,
-		Region:    "us-central1",
-		AccountID: "my-gcp-project",
-	}
-
-	t.Run("chat-default model", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "chat-default", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"}, []string(svccfg.Command))
-		assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
-		assert.Equal(t, "global", *svccfg.Environment["VERTEXAI_LOCATION"])
-	})
-
-	t.Run("embedding-default model", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "embedding-default", info)
-
-		require.Equal(t, []string{"--drop_params", "--model", "vertex_ai/gemini-embedding-001", "--alias", "embedding-default"}, []string(svccfg.Command))
-	})
-}
-
-func TestMakeAccessGatewayServiceAzure(t *testing.T) {
-	// Azure's managed-model provider names the deployment after the alias and
-	// selects the concrete model itself, so the CLI passes the bare alias through
-	// unchanged (no bedrock/vertex_ai-style resolution or prefix) and sets no
-	// provider-specific environment; the provider injects OPENAI_API_KEY.
-	info := &client.AccountInfo{
-		Provider:  client.ProviderAzure,
-		Region:    "eastus",
-		AccountID: "my-azure-sub",
-	}
-
-	for _, alias := range []string{"chat-default", "chat-large", "embedding-default", "some-custom-model"} {
-		t.Run(alias, func(t *testing.T) {
-			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-			svccfg := newLLMService()
-			makeAccessGatewayService(&svccfg, proj, alias, info)
-
-			require.Equal(t, []string{"--drop_params", "--model", alias, "--alias", alias}, []string(svccfg.Command))
-			assert.NotContains(t, svccfg.Environment, "AWS_REGION")
-			assert.NotContains(t, svccfg.Environment, "VERTEXAI_PROJECT")
-			assert.NotContains(t, svccfg.Environment, "VERTEXAI_LOCATION")
-		})
-	}
-}
-
-func TestAccessGatewayChatLarge(t *testing.T) {
-	tests := []struct {
-		name         string
-		provider     client.ProviderID
-		wantModel    string
-		wantLocation string
-	}{
-		{name: "AWS", provider: client.ProviderAWS, wantModel: "bedrock/zai.glm-5"},
-		{name: "GCP", provider: client.ProviderGCP, wantModel: "vertex_ai/gemini-3.1-pro-preview", wantLocation: "global"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			info := &client.AccountInfo{
-				Provider:  tt.provider,
-				Region:    "us-central1",
-				AccountID: "my-gcp-project",
-			}
-			proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
-			svccfg := newLLMService()
-			makeAccessGatewayService(&svccfg, proj, "chat-large", info)
-
-			require.Equal(t, []string{"--drop_params", "--model", tt.wantModel, "--alias", "chat-large"}, []string(svccfg.Command))
-			if tt.provider == client.ProviderAWS {
-				assert.Equal(t, "us-central1", *svccfg.Environment["AWS_REGION"])
-			} else if tt.provider == client.ProviderGCP {
-				assert.Equal(t, "my-gcp-project", *svccfg.Environment["VERTEXAI_PROJECT"])
-				assert.Equal(t, tt.wantLocation, *svccfg.Environment["VERTEXAI_LOCATION"])
-			}
-		})
-	}
-}
-
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	info := &client.AccountInfo{}
 
 	t.Run("no OPENAI_API_KEY uses default key", func(t *testing.T) {
 		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
 		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
 
 		assert.Equal(t, "networkisalreadyprivate", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -221,7 +96,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 			},
 		}
 		svccfg := newLLMService()
-		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
 
 		assert.Equal(t, "sk-my-secret-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -240,7 +115,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 		}
 		svccfg := newLLMService()
 		svccfg.Environment["LITELLM_MASTER_KEY"] = &masterKey
-		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
 
 		app := proj.Services["app"]
 		require.Contains(t, app.Environment, "OPENAI_API_KEY")
@@ -252,7 +127,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 		existingKey := "existing-master-key"
 		svccfg := newLLMService()
 		svccfg.Environment["LITELLM_MASTER_KEY"] = &existingKey
-		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
 
 		assert.Equal(t, "existing-master-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -292,7 +167,7 @@ func TestAccessGatewayResourceDefaults(t *testing.T) {
 				}
 			}
 
-			makeAccessGatewayService(&svccfg, proj, "ai/model", &client.AccountInfo{})
+			require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", &client.AccountInfo{}))
 
 			require.NotNil(t, svccfg.Deploy)
 			require.NotNil(t, svccfg.Deploy.Resources.Reservations)
@@ -367,13 +242,6 @@ func TestFixupLLM(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestModelWithProvider(t *testing.T) {
-	assert.Equal(t, "bedrock/my-model", modelWithProvider("my-model", "bedrock"))
-	assert.Equal(t, "bedrock/my-model", modelWithProvider("bedrock/my-model", "bedrock"))
-	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("gemini-3.5-flash", "vertex_ai"))
-	assert.Equal(t, "vertex_ai/gemini-3.5-flash", modelWithProvider("vertex_ai/gemini-3.5-flash", "vertex_ai"))
 }
 
 func TestFixupImageAndBuildPullPolicy(t *testing.T) {

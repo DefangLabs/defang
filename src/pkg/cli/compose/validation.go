@@ -320,8 +320,8 @@ func validateService(svccfg *composeTypes.ServiceConfig, project *composeTypes.P
 		term.Warnf("service %q: high-availability mode requires at least 2 replicas or x-defang-autoscaling", svccfg.Name)
 	}
 	if reservations == nil || reservations.MemoryBytes == 0 {
-		// Don't show this warning for managed pseudo-services like CDN
-		if svccfg.Extensions["x-defang-static-files"] == nil {
+		// Don't show this warning for managed pseudo-services like CDN or provider-served models
+		if svccfg.Extensions["x-defang-static-files"] == nil && !IsVirtualModelService(svccfg) {
 			term.Warnf("service %q: missing memory reservation; using provider-specific defaults. Specify deploy.resources.reservations.memory to avoid out-of-memory errors", svccfg.Name)
 		}
 	}

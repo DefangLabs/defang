@@ -134,25 +134,34 @@ func TestSecretEnvFiltering(t *testing.T) {
 	assert.NotContains(t, clean, "SCW_SECRET_KEY")
 }
 
-func TestUsesScalewayLLMRequiresEndpointAndMissingKey(t *testing.T) {
-	endpoint := "https://api.scaleway.ai/v1/"
+func TestUsesScalewayLLMFollowsBindings(t *testing.T) {
 	key := "already-set"
-
-	assert.True(t, usesScalewayLLM(&compose.Project{Services: compose.Services{
-		"chat": {Environment: map[string]*string{
-			"OPENAI_BASE_URL": &endpoint,
-			"OPENAI_API_KEY":  nil,
+	llm := compose.ServiceConfig{Extensions: map[string]any{"x-defang-llm": map[string]any{
+		"model":    "chat-default",
+		"bindings": []any{map[string]any{"consumer": "app", "model_var": "LLM_MODEL", "endpoint_var": "LLM_URL"}},
+	}}}
+	tests := []struct {
+		name     string
+		services compose.Services
+		want     bool
+	}{
+		{name: "bound consumer references the config", want: true, services: compose.Services{
+			"llm": llm, "app": {Environment: map[string]*string{"OPENAI_API_KEY": nil}},
 		}},
-	}}))
-	assert.False(t, usesScalewayLLM(&compose.Project{Services: compose.Services{
-		"chat": {Environment: map[string]*string{
-			"OPENAI_BASE_URL": &endpoint,
-			"OPENAI_API_KEY":  &key,
+		{name: "bound consumer sets its own key", services: compose.Services{
+			"llm": llm, "app": {Environment: map[string]*string{"OPENAI_API_KEY": &key}},
 		}},
-	}}))
-	assert.False(t, usesScalewayLLM(&compose.Project{Services: compose.Services{
-		"chat": {Environment: map[string]*string{"OPENAI_API_KEY": nil}},
-	}}))
+		{name: "unbound service references the config", services: compose.Services{
+			"other": {Environment: map[string]*string{"OPENAI_API_KEY": nil}},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := usesScalewayLLM(&compose.Project{Services: tt.services})
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }
 
 func TestDeploymentStatusMapsJobStates(t *testing.T) {
