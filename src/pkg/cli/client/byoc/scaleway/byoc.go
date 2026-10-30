@@ -742,6 +742,9 @@ func (b *ByocScaleway) CdCommand(ctx context.Context, req client.CdCommandReques
 
 // CdList lists Pulumi stacks from the S3 state bucket.
 func (b *ByocScaleway) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], error) {
+	if b.s3Client == nil {
+		return nil, errors.New("not authenticated; call Authenticate first")
+	}
 	bucket := b.bucketName()
 	prefix := ".pulumi/stacks/"
 
