@@ -76,11 +76,6 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 			term.Warnf("service %q: service name is longer than 16 characters, you may run into issues with resource name length", svccfg.Name)
 		}
 
-		// beta docker compose model runner syntax
-		if svccfg.Provider != nil && svccfg.Provider.Type == "model" && svccfg.Image == "" && svccfg.Build == nil {
-			fixupModelProvider(&svccfg, project, accountInfo)
-		}
-
 		if _, llm := svccfg.Extensions["x-defang-llm"]; llm {
 			fixupLLM(&svccfg)
 		}
@@ -100,15 +95,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		project.Services[svccfg.Name] = svccfg
 	}
 
-	// modern docker compose model runner syntax
-	for name, model := range project.Models {
-		model.Name = name // ensure the model has a name
-		svccfg := fixupModel(model, project, accountInfo)
-		if svccfg.Extensions == nil {
-			svccfg.Extensions = make(map[string]interface{})
-		}
-		svccfg.Extensions["x-defang-llm"] = true
-		project.Services[svccfg.Name] = *svccfg
+	// both the top-level models: and the deprecated "provider: type: model" syntax
+	if err := fixupModels(provider, project, accountInfo); err != nil {
+		return err
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
@@ -378,45 +367,13 @@ func fixupIngressPorts(svccfg *composeTypes.ServiceConfig) {
 // Declare a private network for the model provider
 const modelProviderNetwork = "model_provider_private"
 
-func fixupModel(model composeTypes.ModelConfig, project *composeTypes.Project, info *client.AccountInfo) *composeTypes.ServiceConfig {
-	if model.ContextSize != 0 {
-		term.Warnf("model %q: context_size is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
-	}
-	if len(model.RuntimeFlags) > 0 {
-		term.Warnf("model %q: runtime_flags is a Docker Model Runner parameter and is not supported for cloud deployments", model.Name)
-	}
-	svccfg := &composeTypes.ServiceConfig{
-		Name:       model.Name,
-		Extensions: model.Extensions,
-	}
-	makeAccessGatewayService(svccfg, project, model.Model, info)
-	return svccfg
+func gatewayURL(svcName string) string {
+	return "http://" + svcName + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
 }
 
-func fixupModelProvider(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, info *client.AccountInfo) {
-	term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", svccfg.Name)
-	var model string
-	if modelVals := svccfg.Provider.Options["model"]; len(modelVals) == 1 {
-		model = modelVals[0]
-	}
-	makeAccessGatewayService(svccfg, project, model, info)
-}
-
-func makeAccessGatewayService(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) {
-	// Local Docker sets [SERVICE]_URL and [SERVICE]_MODEL environment variables on the dependent services
-	envName := strings.ToUpper(svccfg.Name) // TODO: handle characters that are not allowed in env vars, like '-'
-	endpointEnvVar := envName + "_URL"
-	urlVal := "http://" + svccfg.Name + ":" + strconv.FormatUint(uint64(liteLLMPort), 10) + "/v1/"
-	modelEnvVar := envName + "_MODEL"
-
-	resolvedModel, masterKey := configureAccessGateway(svccfg, project, model, info)
-	wireDependentServices(project, svccfg.Name, urlVal, resolvedModel, masterKey, endpointEnvVar, modelEnvVar)
-}
-
-// configureAccessGateway resolves the model name for the target provider, configures
-// the LiteLLM container (image, command, network, port), and derives LITELLM_MASTER_KEY.
-// Returns the resolved model string and the master key pointer.
-func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) (string, *string) {
+// configureAccessGateway configures the LiteLLM container (image, network, port,
+// resources) and derives LITELLM_MASTER_KEY, which it returns.
+func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *composeTypes.Project) *string {
 	if svccfg.Environment == nil {
 		svccfg.Environment = composeTypes.MappingWithEquals{}
 	}
@@ -433,54 +390,9 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		svccfg.Deploy.Resources.Reservations.MemoryBytes = defaultLLMMemoryMiB * MiB
 	}
 
-	alias := model
-	switch info.Provider {
-	case client.ProviderAWS:
-		switch model {
-		case "chat-default":
-			model = "us.amazon.nova-2-lite-v1:0"
-		case "chat-large":
-			model = "zai.glm-5"
-		case "embedding-default":
-			model = "amazon.titan-embed-text-v2:0"
-		}
-		model = modelWithProvider(model, "bedrock")
-		if info.Region != "" {
-			svccfg.Environment["AWS_REGION"] = &info.Region
-		}
-	case client.ProviderGCP:
-		location := info.Region
-		switch model {
-		case "chat-default":
-			model = "gemini-3.5-flash"
-			location = "global"
-		case "chat-large":
-			model = "gemini-3.1-pro-preview"
-			location = "global"
-		case "embedding-default":
-			model = "gemini-embedding-001"
-		}
-		model = modelWithProvider(model, "vertex_ai")
-		if info.AccountID != "" {
-			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
-		}
-		if location != "" {
-			svccfg.Environment["VERTEXAI_LOCATION"] = &location
-		}
-	case client.ProviderAzure:
-		// Azure's managed-model provider (pulumi-defang defangazure) provisions an
-		// OpenAI-compatible AI Foundry account and creates a deployment named after
-		// the alias, picking the concrete model at deploy time from a region-aware
-		// preference list (models.go chatPreference/embeddingPreference). So unlike
-		// bedrock/vertex_ai we do NOT resolve or prefix the model here: the bare alias
-		// is wired to dependents as {SERVICE}_MODEL, which the provider uses as both
-		// the deployment name and the model routed to the OpenAI-compatible endpoint.
-		// The account key is injected as OPENAI_API_KEY by the provider.
-	}
-
 	// svccfg.HealthCheck = &composeTypes.ServiceHealthCheckConfig{} TODO: add healthcheck
 	svccfg.Image = "litellm/litellm:v1.92.0"
-	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", alias}
+	svccfg.Command = nil
 	if svccfg.Networks == nil {
 		// New compose-go versions do not create networks for "provider:" services, so we need to create it here
 		svccfg.Networks = make(map[string]*composeTypes.ServiceNetworkConfig)
@@ -515,79 +427,7 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 		}
 		svccfg.Environment["LITELLM_MASTER_KEY"] = masterKey
 	}
-
-	return model, masterKey
-}
-
-// wireDependentServices injects URL, model, and API-key env vars and adds the
-// model-provider network to every service that depends on svcName.
-func wireDependentServices(project *composeTypes.Project, svcName, urlVal, model string, masterKey *string, endpointEnvVar, modelEnvVar string) {
-	for name, dependency := range project.Services {
-		changed := false
-
-		if _, ok := dependency.DependsOn[svcName]; ok {
-			if dependency.Environment == nil {
-				dependency.Environment = make(composeTypes.MappingWithEquals)
-			}
-			dependency.Networks[modelProviderNetwork] = nil
-			if _, ok := dependency.Environment[endpointEnvVar]; !ok {
-				dependency.Environment[endpointEnvVar] = &urlVal
-			}
-			if _, ok := dependency.Environment[modelEnvVar]; !ok && model != "" {
-				dependency.Environment[modelEnvVar] = &model
-			}
-			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
-				dependency.Environment["OPENAI_API_KEY"] = masterKey
-			}
-			changed = true
-		}
-
-		if modelDep, ok := dependency.Models[svcName]; ok {
-			endpointVar := endpointEnvVar
-			if modelDep != nil && modelDep.EndpointVariable != "" {
-				endpointVar = modelDep.EndpointVariable
-			}
-			modelVar := modelEnvVar
-			if modelDep != nil && modelDep.ModelVariable != "" {
-				modelVar = modelDep.ModelVariable
-			}
-			if dependency.Environment == nil {
-				dependency.Environment = make(composeTypes.MappingWithEquals)
-			}
-			dependency.Networks[modelProviderNetwork] = nil
-			if _, ok := dependency.Environment[endpointVar]; !ok {
-				dependency.Environment[endpointVar] = &urlVal
-			}
-			if _, ok := dependency.Environment[modelVar]; !ok && model != "" {
-				dependency.Environment[modelVar] = &model
-			}
-			if _, ok := dependency.Environment["OPENAI_API_KEY"]; !ok {
-				dependency.Environment["OPENAI_API_KEY"] = masterKey
-			}
-			// If the model is not already declared as a dependency, add it
-			if _, ok := dependency.DependsOn[svcName]; !ok {
-				if dependency.DependsOn == nil {
-					dependency.DependsOn = make(map[string]composeTypes.ServiceDependency)
-				}
-				dependency.DependsOn[svcName] = composeTypes.ServiceDependency{
-					Condition: composeTypes.ServiceConditionStarted,
-					Required:  true,
-				}
-			}
-			changed = true
-		}
-
-		if changed {
-			project.Services[name] = dependency
-		}
-	}
-}
-
-func modelWithProvider(model, prefix string) string {
-	if strings.Contains(model, "/") {
-		return model // already has a provider prefix
-	}
-	return prefix + "/" + model
+	return masterKey
 }
 
 func GetImageRepo(image string) string {
