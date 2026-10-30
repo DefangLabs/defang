@@ -46,7 +46,7 @@ func fixupRemoteModel(project *composeTypes.Project, name, model string) {
 func resolveModel(model string) string {
 	switch model {
 	case "chat-default":
-		return "llama-3.3-70b-instruct"
+		return "qwen3-235b-a22b-instruct-2507"
 	case "embedding-default":
 		return "bge-multilingual-gemma2"
 	default:
