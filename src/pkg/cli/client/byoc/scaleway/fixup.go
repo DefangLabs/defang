@@ -7,11 +7,19 @@ import (
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 )
 
-var _ compose.ServiceFixupper = (*ByocScaleway)(nil)
+var (
+	_ compose.ServiceFixupper     = (*ByocScaleway)(nil)
+	_ compose.DirectModelProvider = (*ByocScaleway)(nil)
+)
 
-// generativeAPIsURL is the OpenAI-compatible endpoint of Scaleway Generative
-// APIs; consumers call it directly, so no model gateway is deployed.
+// generativeAPIsURL is the OpenAI-compatible endpoint of Scaleway Generative APIs.
 const generativeAPIsURL = "https://api.scaleway.ai/v1/"
+
+// DirectModelEndpoint implements compose.DirectModelProvider: consumers call
+// Generative APIs directly, so no model gateway is deployed.
+func (*ByocScaleway) DirectModelEndpoint() string {
+	return generativeAPIsURL
+}
 
 // FixupServices applies Scaleway requirements before the shared Compose fixups.
 func (*ByocScaleway) FixupServices(_ context.Context, project *composeTypes.Project) error {
@@ -26,5 +34,5 @@ func (*ByocScaleway) FixupServices(_ context.Context, project *composeTypes.Proj
 			project.Services[name] = service
 		}
 	}
-	return compose.FixupDirectModels(project, generativeAPIsURL)
+	return nil
 }

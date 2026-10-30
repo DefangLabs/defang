@@ -202,43 +202,23 @@ func withoutSecretEnv(env map[string]string) map[string]string {
 	return clean
 }
 
-// containerServices omits virtual model services: Generative APIs serve those
-// models, so they have no container whose status could be reported.
-func containerServices(services compose.Services) compose.Services {
-	containers := make(compose.Services, len(services))
-	for name, service := range services {
-		if compose.IsVirtualModelService(&service) {
-			continue
-		}
-		containers[name] = service
-	}
-	return containers
-}
-
 // usesScalewayLLM reports whether a consumer of a managed model authenticates
 // with the OPENAI_API_KEY config, which then has to exist.
-func usesScalewayLLM(project *compose.Project) (bool, error) {
-	for name, service := range project.Services {
-		ext, err := compose.ParseLLMExtension(service.Extensions["x-defang-llm"])
-		if err != nil {
-			return false, fmt.Errorf("service %q: %w", name, err)
-		}
-		if ext == nil {
+func usesScalewayLLM(project *compose.Project) bool {
+	for _, service := range project.Services {
+		if len(service.Models) == 0 {
 			continue
 		}
-		for _, binding := range ext.Bindings {
-			consumer := project.Services[binding.Consumer]
-			if key, ok := consumer.Environment["OPENAI_API_KEY"]; ok && key == nil {
-				return true, nil
-			}
+		if key, ok := service.Environment["OPENAI_API_KEY"]; ok && key == nil {
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 func (b *ByocScaleway) ensureScalewayLLMAuth(ctx context.Context, project *compose.Project) error {
-	if uses, err := usesScalewayLLM(project); err != nil || !uses {
-		return err
+	if !usesScalewayLLM(project) {
+		return nil
 	}
 
 	configs, err := b.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
@@ -366,7 +346,7 @@ func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cm
 	}
 
 	etag := types.NewEtag()
-	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, containerServices(project.Services))
+	serviceInfos, err := b.GetServiceInfos(ctx, project.Name, req.DelegateDomain, etag, project.Services)
 	if err != nil {
 		return nil, err
 	}

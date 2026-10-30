@@ -74,8 +74,8 @@ type modelContractVerifier interface {
 // verifyModelContract fails before anything is uploaded when the project asks
 // the CD engine to resolve a managed model and the engine cannot.
 func verifyModelContract(ctx context.Context, provider client.Provider, project *compose.Project) error {
-	if hasRequests, err := compose.HasModelRequests(project); err != nil || !hasRequests {
-		return err
+	if len(project.Models) == 0 {
+		return nil
 	}
 	verifier, ok := provider.(modelContractVerifier)
 	if !ok {

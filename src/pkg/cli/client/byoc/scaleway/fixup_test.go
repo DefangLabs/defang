@@ -37,24 +37,18 @@ func TestScalewayFixupModelRequestPayload(t *testing.T) {
 
 	reloaded, err := compose.LoadFromContent(t.Context(), payload, "")
 	require.NoError(t, err, "the deploy payload must have no orphan model references")
-	assert.Empty(t, reloaded.Models)
+	assert.Equal(t, []string{"app", "worker"}, slices.Sorted(maps.Keys(reloaded.Services)), "Generative APIs serve the models; no model service runs")
+	assert.Equal(t, []string{"chat", "embed", "exact", "large"}, slices.Sorted(maps.Keys(reloaded.Models)))
 	assert.NotContains(t, reloaded.Networks, "model_provider_private")
-	for _, name := range []string{"chat", "embed", "exact", "large"} {
-		service := reloaded.Services[name]
-		assert.Empty(t, service.Image, "Generative APIs serve the model; no container runs")
-		ext, err := compose.ParseLLMExtension(service.Extensions["x-defang-llm"])
-		require.NoError(t, err)
-		require.NotNil(t, ext)
-	}
 	app := reloaded.Services["app"]
 	assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"], "explicit endpoint stays authoritative")
 	assert.Equal(t, generativeAPIsURL, *app.Environment["EMBED_BASE_URL"])
-	assert.NotContains(t, app.Environment, "EMBED_MODEL_NAME", "the CD engine injects the resolved model ID")
+	assert.NotContains(t, app.Environment, "EMBED_MODEL_NAME", "the CD engine writes the resolved model ID")
 	assert.Contains(t, app.Environment, "OPENAI_API_KEY")
 	assert.Nil(t, app.Environment["OPENAI_API_KEY"], "the API key is a Secret Manager reference")
 	assert.Empty(t, app.DependsOn)
-	assert.Empty(t, app.Models)
-	assert.Equal(t, []string{"app", "worker"}, slices.Sorted(maps.Keys(containerServices(reloaded.Services))))
+	assert.Equal(t, &composeTypes.ServiceModelConfig{EndpointVariable: "EMBED_BASE_URL", ModelVariable: "EMBED_MODEL_NAME"}, app.Models["embed"])
+	assert.True(t, usesScalewayLLM(reloaded))
 
 	require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
 	again, err := compose.MarshalYAML(project)

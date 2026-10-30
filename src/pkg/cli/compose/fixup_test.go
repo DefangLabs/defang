@@ -69,12 +69,10 @@ func newLLMService() composeTypes.ServiceConfig {
 }
 
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
-	info := &client.AccountInfo{}
-
 	t.Run("no OPENAI_API_KEY uses default key", func(t *testing.T) {
 		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
 		svccfg := newLLMService()
-		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
+		svccfg = makeLiteralGateway(svccfg, proj, "ai/model")
 
 		assert.Equal(t, "networkisalreadyprivate", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -96,7 +94,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 			},
 		}
 		svccfg := newLLMService()
-		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
+		svccfg = makeLiteralGateway(svccfg, proj, "ai/model")
 
 		assert.Equal(t, "sk-my-secret-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -115,7 +113,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 		}
 		svccfg := newLLMService()
 		svccfg.Environment["LITELLM_MASTER_KEY"] = &masterKey
-		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
+		makeLiteralGateway(svccfg, proj, "ai/model")
 
 		app := proj.Services["app"]
 		require.Contains(t, app.Environment, "OPENAI_API_KEY")
@@ -127,7 +125,7 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 		existingKey := "existing-master-key"
 		svccfg := newLLMService()
 		svccfg.Environment["LITELLM_MASTER_KEY"] = &existingKey
-		require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", info))
+		svccfg = makeLiteralGateway(svccfg, proj, "ai/model")
 
 		assert.Equal(t, "existing-master-key", *svccfg.Environment["LITELLM_MASTER_KEY"])
 	})
@@ -167,7 +165,7 @@ func TestAccessGatewayResourceDefaults(t *testing.T) {
 				}
 			}
 
-			require.NoError(t, makeAccessGatewayService(&svccfg, proj, "ai/model", &client.AccountInfo{}))
+			svccfg = makeLiteralGateway(svccfg, proj, "ai/model")
 
 			require.NotNil(t, svccfg.Deploy)
 			require.NotNil(t, svccfg.Deploy.Resources.Reservations)

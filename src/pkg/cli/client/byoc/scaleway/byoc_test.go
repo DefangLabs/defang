@@ -18,6 +18,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/logs"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -134,32 +135,27 @@ func TestSecretEnvFiltering(t *testing.T) {
 	assert.NotContains(t, clean, "SCW_SECRET_KEY")
 }
 
-func TestUsesScalewayLLMFollowsBindings(t *testing.T) {
+func TestUsesScalewayLLMFollowsModelConsumers(t *testing.T) {
 	key := "already-set"
-	llm := compose.ServiceConfig{Extensions: map[string]any{"x-defang-llm": map[string]any{
-		"model":    "chat-default",
-		"bindings": []any{map[string]any{"consumer": "app", "model_var": "LLM_MODEL", "endpoint_var": "LLM_URL"}},
-	}}}
+	models := map[string]*composeTypes.ServiceModelConfig{"llm": {EndpointVariable: "LLM_URL", ModelVariable: "LLM_MODEL"}}
 	tests := []struct {
-		name     string
-		services compose.Services
-		want     bool
+		name    string
+		service compose.ServiceConfig
+		want    bool
 	}{
-		{name: "bound consumer references the config", want: true, services: compose.Services{
-			"llm": llm, "app": {Environment: map[string]*string{"OPENAI_API_KEY": nil}},
+		{name: "model consumer references the config", want: true, service: compose.ServiceConfig{
+			Models: models, Environment: map[string]*string{"OPENAI_API_KEY": nil},
 		}},
-		{name: "bound consumer sets its own key", services: compose.Services{
-			"llm": llm, "app": {Environment: map[string]*string{"OPENAI_API_KEY": &key}},
+		{name: "model consumer sets its own key", service: compose.ServiceConfig{
+			Models: models, Environment: map[string]*string{"OPENAI_API_KEY": &key},
 		}},
-		{name: "unbound service references the config", services: compose.Services{
-			"other": {Environment: map[string]*string{"OPENAI_API_KEY": nil}},
+		{name: "other service references the config", service: compose.ServiceConfig{
+			Environment: map[string]*string{"OPENAI_API_KEY": nil},
 		}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := usesScalewayLLM(&compose.Project{Services: tt.services})
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.Equal(t, tt.want, usesScalewayLLM(&compose.Project{Services: compose.Services{"app": tt.service}}))
 		})
 	}
 }

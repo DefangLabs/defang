@@ -21,6 +21,12 @@ func (p accountProvider) AccountInfo(context.Context) (*client.AccountInfo, erro
 	return &p.info, nil
 }
 
+type directProvider struct {
+	client.MockProvider
+}
+
+func (directProvider) DirectModelEndpoint() string { return "https://inference.example/v1/" }
+
 const modelRequestsCompose = "testdata/model-requests/compose.yaml"
 
 func loadModelRequests(t *testing.T) *Project {
@@ -28,6 +34,42 @@ func loadModelRequests(t *testing.T) *Project {
 	project, err := NewLoader(WithPath(modelRequestsCompose)).LoadProject(t.Context())
 	require.NoError(t, err)
 	return project
+}
+
+func binding(endpointVar, modelVar string) *composeTypes.ServiceModelConfig {
+	return &composeTypes.ServiceModelConfig{EndpointVariable: endpointVar, ModelVariable: modelVar}
+}
+
+// Requests stay in models:, and every consumer names both of its variables.
+var wantModelRequests = map[string]string{
+	"chat":  "ai/chat-default",
+	"embed": "embedding-default",
+	"exact": "us.amazon.nova-2-lite-v1:0",
+	"large": "chat-large",
+}
+
+var wantBindings = map[string]map[string]*composeTypes.ServiceModelConfig{
+	"app": {
+		"chat":  binding("CHAT_URL", "CHAT_MODEL"),
+		"embed": binding("EMBED_BASE_URL", "EMBED_MODEL_NAME"),
+	},
+	"worker": {
+		"chat":  binding("CHAT_URL", "WORKER_CHAT_MODEL"),
+		"exact": binding("EXACT_URL", "EXACT_MODEL"),
+		"large": binding("LARGE_URL", "LARGE_MODEL"),
+	},
+}
+
+func assertModelPayload(t *testing.T, project *Project) {
+	t.Helper()
+	requests := map[string]string{}
+	for name, model := range project.Models {
+		requests[name] = model.Model
+	}
+	assert.Equal(t, wantModelRequests, requests)
+	for consumer, want := range wantBindings {
+		assert.Equal(t, want, project.Services[consumer].Models, consumer)
+	}
 }
 
 // The payload is what the CD engine receives, so it is compared as a whole.
@@ -46,142 +88,101 @@ func TestFixupModelRequestPayloads(t *testing.T) {
 
 			reloaded, err := LoadFromContent(t.Context(), payload, "")
 			require.NoError(t, err)
-			assertModelRequests(t, reloaded, map[string]LLMExtension{
-				"chat": {Model: "ai/chat-default", Bindings: []ModelBinding{
-					{Consumer: "app", ModelVar: "CHAT_MODEL", EndpointVar: "CHAT_URL", Supplied: []string{"model"}},
-					{Consumer: "worker", ModelVar: "WORKER_CHAT_MODEL", EndpointVar: "CHAT_URL", Supplied: []string{"model", "endpoint"}},
-				}},
-				"embed": {Model: "embedding-default", Bindings: []ModelBinding{
-					{Consumer: "app", ModelVar: "EMBED_MODEL_NAME", EndpointVar: "EMBED_BASE_URL", Supplied: []string{"model", "endpoint"}},
-				}},
-				"exact": {Model: "us.amazon.nova-2-lite-v1:0", Bindings: []ModelBinding{
-					{Consumer: "worker", ModelVar: "EXACT_MODEL", EndpointVar: "EXACT_URL", Supplied: []string{"model", "endpoint"}},
-				}},
-				"large": {Model: "chat-large", Bindings: []ModelBinding{
-					{Consumer: "worker", ModelVar: "LARGE_MODEL", EndpointVar: "LARGE_URL", Supplied: []string{"endpoint"}},
-				}},
-			})
-
-			for _, name := range []string{"chat", "embed", "exact", "large"} {
+			assertModelPayload(t, reloaded)
+			for name := range wantModelRequests {
 				gateway := reloaded.Services[name]
-				assert.Empty(t, gateway.Command, "the CD engine owns the gateway command")
-				assert.NotContains(t, gateway.Environment, "VERTEXAI_LOCATION", "the location depends on the resolved model")
-				assert.Equal(t, "litellm/litellm:v1.92.0", gateway.Image)
+				assert.Equal(t, "litellm/litellm:v1.92.0", gateway.Image, name)
+				assert.Equal(t, true, gateway.Extensions["x-defang-llm"], name)
+				assert.Empty(t, gateway.Command, "%s: the CD engine owns the gateway routing", name)
+				assert.NotContains(t, gateway.Environment, "VERTEXAI_LOCATION", "%s: the location depends on the resolved model", name)
 			}
+			assert.Equal(t, "DEBUG", *reloaded.Services["large"].Environment["LITELLM_LOG"])
+
 			app, worker := reloaded.Services["app"], reloaded.Services["worker"]
-			assert.NotContains(t, app.Environment, "CHAT_MODEL", "the CD engine injects supplied model names")
-			assert.NotContains(t, worker.Environment, "WORKER_CHAT_MODEL")
-			assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"])
-			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"])
-		})
-	}
-}
-
-func assertModelRequests(t *testing.T, project *Project, want map[string]LLMExtension) {
-	t.Helper()
-	got := map[string]LLMExtension{}
-	for name, service := range project.Services {
-		ext, err := ParseLLMExtension(service.Extensions["x-defang-llm"])
-		require.NoError(t, err)
-		if ext != nil {
-			got[name] = *ext
-		}
-	}
-	assert.Equal(t, want, got)
-	hasRequests, err := HasModelRequests(project)
-	require.NoError(t, err)
-	assert.Equal(t, len(want) > 0, hasRequests)
-}
-
-func TestFixupModelRequestErrors(t *testing.T) {
-	tests := []struct {
-		name     string
-		provider client.ProviderID
-		compose  string
-		wantErr  string
-	}{
-		{
-			name:     "DigitalOcean has no managed models",
-			provider: client.ProviderDO,
-			compose:  "models:\n  llm:\n    model: chat-default\n",
-			wantErr:  `model "llm": managed models are not supported on DigitalOcean`,
-		},
-		{
-			name:     "deprecated syntax without a model",
-			provider: client.ProviderAWS,
-			compose:  "  llm:\n    provider:\n      type: model\n",
-			wantErr:  `service "llm": no model specified`,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			project, err := LoadFromContent(t.Context(), []byte("name: demo\nservices:\n  app:\n    image: app\n"+tt.compose), "")
-			require.NoError(t, err)
-			err = FixupServices(t.Context(), accountProvider{info: client.AccountInfo{Provider: tt.provider}}, project, UploadModeIgnore)
-			assert.ErrorContains(t, err, tt.wantErr)
+			assert.Equal(t, "chat-default", *app.Environment["CHAT_MODEL"], "the ai/ spelling of a built-in alias is normalized")
+			assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"], "explicit endpoint stays authoritative")
+			assert.Equal(t, "embedding-default", *app.Environment["EMBED_MODEL_NAME"])
+			assert.Equal(t, "chat-default", *worker.Environment["WORKER_CHAT_MODEL"])
+			assert.Equal(t, "us.amazon.nova-2-lite-v1:0", *worker.Environment["EXACT_MODEL"])
+			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"], "explicit model stays authoritative")
 		})
 	}
 }
 
 func TestFixupDirectModels(t *testing.T) {
 	project := loadModelRequests(t)
-	require.NoError(t, FixupDirectModels(project, "https://inference.example/v1/"))
+	require.NoError(t, FixupServices(t.Context(), directProvider{}, project, UploadModeIgnore))
 
-	assert.Empty(t, project.Models)
-	assertModelRequests(t, project, map[string]LLMExtension{
-		"chat": {Model: "ai/chat-default", Bindings: []ModelBinding{
-			{Consumer: "app", ModelVar: "CHAT_MODEL", EndpointVar: "CHAT_URL", Supplied: []string{"model"}},
-			{Consumer: "worker", ModelVar: "WORKER_CHAT_MODEL", EndpointVar: "CHAT_URL", Supplied: []string{"model", "endpoint"}},
-		}},
-		"embed": {Model: "embedding-default", Bindings: []ModelBinding{
-			{Consumer: "app", ModelVar: "EMBED_MODEL_NAME", EndpointVar: "EMBED_BASE_URL", Supplied: []string{"model", "endpoint"}},
-		}},
-		"exact": {Model: "us.amazon.nova-2-lite-v1:0", Bindings: []ModelBinding{
-			{Consumer: "worker", ModelVar: "EXACT_MODEL", EndpointVar: "EXACT_URL", Supplied: []string{"model", "endpoint"}},
-		}},
-		"large": {Model: "chat-large", Bindings: []ModelBinding{
-			{Consumer: "worker", ModelVar: "LARGE_MODEL", EndpointVar: "LARGE_URL", Supplied: []string{"endpoint"}},
-		}},
-	})
-	for _, name := range []string{"chat", "embed", "exact", "large"} {
-		assert.Equal(t, composeTypes.ServiceConfig{Name: name, Extensions: project.Services[name].Extensions}, project.Services[name],
-			"a direct model service is virtual: no container, gateway or network")
+	assertModelPayload(t, project)
+	for name := range wantModelRequests {
+		assert.NotContains(t, project.Services, name, "a provider-served model has no service")
 	}
-	worker := project.Services["worker"]
-	assert.Empty(t, worker.DependsOn)
-	assert.Empty(t, worker.Models)
-	assert.NotContains(t, worker.Networks, modelProviderNetwork)
-	assert.Equal(t, "https://inference.example/v1/", *worker.Environment["CHAT_URL"])
-	assert.Contains(t, worker.Environment, "OPENAI_API_KEY")
-	assert.Nil(t, worker.Environment["OPENAI_API_KEY"], "the API key is a config reference")
-	assert.NotContains(t, worker.Environment, "WORKER_CHAT_MODEL")
+	assert.NotContains(t, project.Networks, modelProviderNetwork)
+	for _, name := range []string{"app", "worker"} {
+		consumer := project.Services[name]
+		assert.Empty(t, consumer.DependsOn, name)
+		assert.NotContains(t, consumer.Networks, modelProviderNetwork, name)
+		assert.Contains(t, consumer.Environment, "OPENAI_API_KEY", name)
+		assert.Nil(t, consumer.Environment["OPENAI_API_KEY"], "%s: the API key is a config reference", name)
+	}
+	app, worker := project.Services["app"], project.Services["worker"]
+	assert.Equal(t, "https://inference.example/v1/", *app.Environment["EMBED_BASE_URL"])
+	assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"])
+	for _, modelVar := range []string{"CHAT_MODEL", "EMBED_MODEL_NAME"} {
+		assert.NotContains(t, app.Environment, modelVar, "the CD engine writes the resolved model ID")
+	}
+	assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"])
 
-	t.Run("missing model", func(t *testing.T) {
-		project := &Project{Services: composeTypes.Services{}, Models: map[string]composeTypes.ModelConfig{"llm": {}}}
-		assert.ErrorContains(t, FixupDirectModels(project, "https://inference.example/v1/"), `model "llm": no model specified`)
-	})
+	payload, err := MarshalYAML(project)
+	require.NoError(t, err)
+	_, err = LoadFromContent(t.Context(), payload, "")
+	require.NoError(t, err, "the payload must not reference a missing model or service")
 }
 
-func TestParseLLMExtension(t *testing.T) {
+func TestFixupModelRequestErrors(t *testing.T) {
 	tests := []struct {
-		name  string
-		value any
-		want  *LLMExtension
+		name     string
+		provider client.Provider
+		compose  string
+		wantErr  string
 	}{
-		{name: "scalar marks a user-managed gateway", value: true},
-		{name: "empty object from an old CLI", value: map[string]any{}},
-		{name: "decoded YAML", value: map[string]any{
-			"model":    "chat-default",
-			"bindings": []any{map[string]any{"consumer": "app", "model_var": "M", "endpoint_var": "U", "supplied": []any{"model"}}},
-		}, want: &LLMExtension{Model: "chat-default", Bindings: []ModelBinding{{Consumer: "app", ModelVar: "M", EndpointVar: "U", Supplied: []string{"model"}}}}},
+		{
+			name:     "DigitalOcean has no managed models",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderDO}},
+			compose:  "models:\n  llm:\n    model: chat-default\n",
+			wantErr:  "managed models are not supported on DigitalOcean",
+		},
+		{
+			name:     "deprecated syntax without a model",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderAWS}},
+			compose:  "  llm:\n    provider:\n      type: model\n",
+			wantErr:  `service "llm": no model specified`,
+		},
+		{
+			name:     "top-level model without a model",
+			provider: directProvider{},
+			compose:  "models:\n  llm:\n    model: \"\"\n",
+			wantErr:  `model "llm": no model specified`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ParseLLMExtension(tt.value)
+			project, err := LoadFromContent(t.Context(), []byte("name: demo\nservices:\n  app:\n    image: app\n"+tt.compose), "")
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
+			assert.ErrorContains(t, FixupServices(t.Context(), tt.provider, project, UploadModeIgnore), tt.wantErr)
 		})
 	}
-	_, err := ParseLLMExtension(map[string]any{"model": []any{"not", "a", "string"}})
-	assert.Error(t, err)
+}
+
+func TestApplicationModelName(t *testing.T) {
+	for model, want := range map[string]string{
+		"ai/chat-default":      "chat-default",
+		"ai/chat-large":        "chat-large",
+		"ai/embedding-default": "embedding-default",
+		"ai/smollm2":           "ai/smollm2",
+		"chat-default":         "chat-default",
+		"bedrock/ai/model":     "bedrock/ai/model",
+	} {
+		assert.Equal(t, want, applicationModelName(model), model)
+	}
 }
