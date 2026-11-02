@@ -1,0 +1,143 @@
+name: modeldemo
+services:
+  app:
+    depends_on:
+      chat:
+        condition: service_started
+        required: true
+      embed:
+        condition: service_started
+        required: true
+    environment:
+      CHAT_MODEL: chat-default
+      CHAT_URL: https://proxy.example/v1/
+      EMBED_BASE_URL: http://mock-embed:4000/v1/
+      EMBED_MODEL_NAME: embedding-default
+      OPENAI_API_KEY: networkisalreadyprivate
+    image: app
+    models:
+      chat:
+        endpoint_var: CHAT_URL
+        model_var: CHAT_MODEL
+      embed:
+        endpoint_var: EMBED_BASE_URL
+        model_var: EMBED_MODEL_NAME
+    networks:
+      default: null
+      model_provider_private: null
+  chat:
+    deploy:
+      resources:
+        reservations:
+          cpus: 0.5
+          memory: "2147483648"
+    environment:
+      LITELLM_MASTER_KEY: networkisalreadyprivate
+      VERTEXAI_PROJECT: my-project
+    image: litellm/litellm:v1.92.0
+    networks:
+      model_provider_private: null
+    ports:
+      - mode: host
+        target: 4000
+        protocol: tcp
+    x-defang-llm: true
+  embed:
+    deploy:
+      resources:
+        reservations:
+          cpus: 0.5
+          memory: "2147483648"
+    environment:
+      LITELLM_MASTER_KEY: networkisalreadyprivate
+      VERTEXAI_PROJECT: my-project
+    image: litellm/litellm:v1.92.0
+    networks:
+      model_provider_private: null
+    ports:
+      - mode: host
+        target: 4000
+        protocol: tcp
+    x-defang-llm: true
+  exact:
+    deploy:
+      resources:
+        reservations:
+          cpus: 0.5
+          memory: "2147483648"
+    environment:
+      LITELLM_MASTER_KEY: networkisalreadyprivate
+      VERTEXAI_PROJECT: my-project
+    image: litellm/litellm:v1.92.0
+    networks:
+      model_provider_private: null
+    ports:
+      - mode: host
+        target: 4000
+        protocol: tcp
+    x-defang-llm: true
+  large:
+    deploy:
+      resources:
+        reservations:
+          cpus: 0.5
+          memory: "2147483648"
+    environment:
+      LITELLM_LOG: DEBUG
+      LITELLM_MASTER_KEY: networkisalreadyprivate
+      VERTEXAI_PROJECT: my-project
+    image: litellm/litellm:v1.92.0
+    networks:
+      model_provider_private: null
+    ports:
+      - mode: host
+        target: 4000
+        protocol: tcp
+    x-defang-llm: true
+  worker:
+    depends_on:
+      chat:
+        condition: service_started
+        required: true
+      exact:
+        condition: service_started
+        required: true
+      large:
+        condition: service_started
+        required: true
+    environment:
+      CHAT_URL: http://mock-chat:4000/v1/
+      EXACT_MODEL: us.amazon.nova-2-lite-v1:0
+      EXACT_URL: http://mock-exact:4000/v1/
+      LARGE_MODEL: my-pinned-name
+      LARGE_URL: http://mock-large:4000/v1/
+      OPENAI_API_KEY: networkisalreadyprivate
+      WORKER_CHAT_MODEL: chat-default
+    image: worker
+    models:
+      chat:
+        endpoint_var: CHAT_URL
+        model_var: WORKER_CHAT_MODEL
+      exact:
+        endpoint_var: EXACT_URL
+        model_var: EXACT_MODEL
+      large:
+        endpoint_var: LARGE_URL
+        model_var: LARGE_MODEL
+    networks:
+      default: null
+      model_provider_private: null
+networks:
+  default:
+    name: modeldemo_default
+  model_provider_private:
+    name: model_provider_private
+models:
+  chat:
+    model: ai/chat-default
+  embed:
+    model: embedding-default
+  exact:
+    model: us.amazon.nova-2-lite-v1:0
+  large:
+    model: chat-large

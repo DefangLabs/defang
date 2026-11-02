@@ -67,6 +67,23 @@ func checkDeploymentMode(prevMode, newMode modes.Mode) (modes.Mode, error) {
 	return newMode, nil
 }
 
+type modelContractVerifier interface {
+	VerifyModelContract(ctx context.Context) error
+}
+
+// verifyModelContract fails before anything is uploaded when the project asks
+// the CD engine to resolve a managed model and the engine cannot.
+func verifyModelContract(ctx context.Context, provider client.Provider, project *compose.Project) error {
+	if len(project.Models) == 0 {
+		return nil
+	}
+	verifier, ok := provider.(modelContractVerifier)
+	if !ok {
+		return nil
+	}
+	return verifier.VerifyModelContract(ctx)
+}
+
 // ComposeUp validates a compose project and uploads the services using the client
 func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.Provider, stack *stacks.Parameters, params ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error) {
 	upload := params.UploadMode
@@ -115,6 +132,13 @@ func ComposeUp(ctx context.Context, fabric client.FabricClient, provider client.
 	if upload == compose.UploadModeIgnore {
 		term.Println(string(composeYaml))
 		return nil, project, dryrun.ErrDryRun
+	}
+
+	// Fabric runs the estimate engine; every other upload runs the provider's selected CD image.
+	if upload != compose.UploadModeEstimate {
+		if err := verifyModelContract(ctx, provider, fixedProject); err != nil {
+			return nil, project, err
+		}
 	}
 
 	delegateDomain, err := fabric.GetDelegateSubdomainZone(ctx, &defangv1.GetDelegateSubdomainZoneRequest{

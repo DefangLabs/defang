@@ -1,0 +1,37 @@
+# One application exercising every model-request shape; the same file feeds the
+# payload tests for every cloud.
+name: modeldemo
+services:
+  app: # default variables, a custom pair, and an explicit endpoint override
+    image: app
+    environment:
+      CHAT_URL: https://proxy.example/v1/
+    models:
+      chat:
+      embed:
+        endpoint_var: EMBED_BASE_URL
+        model_var: EMBED_MODEL_NAME
+  worker: # deprecated syntax via depends_on, with an explicit model override
+    image: worker
+    environment:
+      LARGE_MODEL: my-pinned-name
+    depends_on:
+      - large
+    models:
+      chat:
+        model_var: WORKER_CHAT_MODEL
+      exact:
+  large: # the deprecated syntax; its settings carry over to the gateway
+    environment:
+      LITELLM_LOG: DEBUG
+    provider:
+      type: model
+      options:
+        model: chat-large
+models:
+  chat:
+    model: ai/chat-default
+  embed:
+    model: embedding-default
+  exact:
+    model: us.amazon.nova-2-lite-v1:0

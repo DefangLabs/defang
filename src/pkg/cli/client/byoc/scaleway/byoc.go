@@ -202,20 +202,14 @@ func withoutSecretEnv(env map[string]string) map[string]string {
 	return clean
 }
 
+// usesScalewayLLM reports whether a consumer of a managed model authenticates
+// with the OPENAI_API_KEY config, which then has to exist.
 func usesScalewayLLM(project *compose.Project) bool {
 	for _, service := range project.Services {
-		hasScalewayEndpoint := false
-		needsOpenAIKey := false
-		for key, val := range service.Environment {
-			if val == nil && key == "OPENAI_API_KEY" {
-				needsOpenAIKey = true
-				continue
-			}
-			if val != nil && *val == "https://api.scaleway.ai/v1/" {
-				hasScalewayEndpoint = true
-			}
+		if len(service.Models) == 0 {
+			continue
 		}
-		if hasScalewayEndpoint && needsOpenAIKey {
+		if key, ok := service.Environment["OPENAI_API_KEY"]; ok && key == nil {
 			return true
 		}
 	}

@@ -19,6 +19,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	"github.com/DefangLabs/defang/src/pkg/types"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -565,6 +566,89 @@ func Test_checkDeploymentMode(t *testing.T) {
 			}
 			if gotMode != tt.wantMode {
 				t.Errorf("checkDeploymentMode() gotMode = %v, want %v", gotMode, tt.wantMode)
+			}
+		})
+	}
+}
+
+type modelContractProvider struct {
+	*mockDeployProvider
+	verifyErr error
+	verified  int
+	deployed  []byte
+}
+
+func (*modelContractProvider) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
+	return &client.AccountInfo{Provider: client.ProviderAWS, Region: "us-west-2"}, ctx.Err()
+}
+
+func (p *modelContractProvider) VerifyModelContract(context.Context) error {
+	p.verified++
+	return p.verifyErr
+}
+
+func (p *modelContractProvider) Deploy(ctx context.Context, req *client.DeployRequest) (*client.DeployResponse, error) {
+	p.deployed = req.Compose
+	return p.mockDeployProvider.Deploy(ctx, req)
+}
+
+func TestComposeUpVerifiesModelContract(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+
+	withModel := func() *compose.Project {
+		return &compose.Project{
+			Name: "test-project",
+			Services: compose.Services{"app": compose.ServiceConfig{
+				Name:     "app",
+				Image:    "app",
+				Models:   map[string]*composeTypes.ServiceModelConfig{"llm": nil},
+				Networks: map[string]*composeTypes.ServiceNetworkConfig{},
+			}},
+			Models:   map[string]composeTypes.ModelConfig{"llm": {Model: "chat-default"}},
+			Networks: composeTypes.Networks{},
+		}
+	}
+	withoutModel := func() *compose.Project {
+		return &compose.Project{Name: "test-project", Services: compose.Services{"app": compose.ServiceConfig{Name: "app", Image: "app"}}}
+	}
+	errOldEngine := errors.New("old engine")
+
+	tests := []struct {
+		name         string
+		project      *compose.Project
+		upload       compose.UploadMode
+		verifyErr    error
+		wantErr      error
+		wantVerified int
+	}{
+		{name: "compatible engine deploys the request", project: withModel(), upload: compose.UploadModeDigest, wantVerified: 1},
+		{name: "incompatible engine stops before upload", project: withModel(), upload: compose.UploadModeDigest, verifyErr: errOldEngine, wantErr: errOldEngine, wantVerified: 1},
+		{name: "preview runs the same engine", project: withModel(), upload: compose.UploadModePreview, verifyErr: errOldEngine, wantErr: errOldEngine, wantVerified: 1},
+		{name: "dry run only prints the request", project: withModel(), upload: compose.UploadModeIgnore, verifyErr: errOldEngine, wantErr: dryrun.ErrDryRun},
+		{name: "projects without models never check", project: withoutModel(), upload: compose.UploadModeDigest, verifyErr: errOldEngine},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &modelContractProvider{
+				mockDeployProvider: &mockDeployProvider{MockProvider: client.MockProvider{UploadUrl: server.URL + "/"}},
+				verifyErr:          tt.verifyErr,
+			}
+			_, _, err := ComposeUp(t.Context(), client.MockFabricClient{DelegateDomain: "example.com"}, provider, &stacks.Parameters{}, ComposeUpParams{
+				Project:    tt.project,
+				UploadMode: tt.upload,
+			})
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.wantVerified, provider.verified)
+			if tt.wantErr != nil {
+				require.Nil(t, provider.deployed, "nothing may be uploaded to an engine that cannot resolve the request")
+			} else if tt.upload == compose.UploadModeDigest && tt.project.Models != nil {
+				deployed, err := compose.LoadFromContent(t.Context(), provider.deployed, "")
+				require.NoError(t, err)
+				require.Equal(t, "chat-default", deployed.Models["llm"].Model, "the request reaches the CD engine as written")
+				require.Empty(t, deployed.Services["llm"].Command, "the CD engine routes the gateway")
 			}
 		})
 	}
