@@ -691,6 +691,28 @@ func TestCollectDomainJobs(t *testing.T) {
 			}},
 			want: []string{"web.example.com", "alt.example.com", "third.example.com"},
 		},
+		{
+			name: "skips wildcard aliases",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "id"}, UseAcmeCert: true, Domainname: "id.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"id": {Name: "id", DomainName: "id.example.com", Networks: map[string]*composetypes.ServiceNetworkConfig{
+					"default": {Aliases: []string{"*.id.example.com"}},
+				}},
+			}},
+			want: []string{"id.example.com"},
+		},
+		{
+			name: "skips a wildcard domainname",
+			services: []*defangv1.ServiceInfo{
+				{Service: &defangv1.Service{Name: "id"}, UseAcmeCert: true, Domainname: "*.id.example.com"},
+			},
+			project: &compose.Project{Services: compose.Services{
+				"id": {Name: "id", DomainName: "*.id.example.com"},
+			}},
+			want: nil,
+		},
 	}
 
 	for _, tt := range tests {

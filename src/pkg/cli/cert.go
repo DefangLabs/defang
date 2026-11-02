@@ -140,7 +140,7 @@ func GenerateLetsEncryptCert(ctx context.Context, project *compose.Project, fab 
 	issuer, _ := provider.(CertIssuer)
 	jobs := collectDomainJobs(project, services.Services)
 	if len(jobs) == 0 {
-		term.Infof("No `domainname` found in compose file; no HTTPS cert generation needed")
+		term.Infof("No `domainname` needs a cert from this command; no HTTPS cert generation needed")
 		return nil
 	}
 
@@ -183,6 +183,13 @@ func collectDomainJobs(project *compose.Project, services []*defangv1.ServiceInf
 			domains = append(domains, defaultNetwork.Aliases...)
 		}
 		for _, d := range domains {
+			// A wildcard cannot get a per-host cert: ACME HTTP-01 and Container
+			// Apps managed certs both refuse it. Where defang serves one (Azure
+			// Front Door), the CD provisions its cert.
+			if strings.HasPrefix(d, "*.") {
+				term.Infof("service %q: skipping wildcard hostname %q; its certificate is managed by the deployment", svc.Name, d)
+				continue
+			}
 			jobs = append(jobs, domainJob{serviceName: svc.Name, domain: d, targets: targets})
 		}
 	}
