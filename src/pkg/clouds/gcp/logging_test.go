@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"iter"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 )
 
 // mockTailLogEntriesClient implements loggingpb.LoggingServiceV2_TailLogEntriesClient
-// for unit testing gcpLoggingTailer.Next().
+// for unit testing tailEntries().
 type mockTailLogEntriesClient struct {
 	responses []*loggingpb.TailLogEntriesResponse
 	err       error
@@ -45,27 +46,31 @@ func (m *mockTailLogEntriesClient) RecvMsg(any) error            { return nil }
 
 var _ grpc.ClientStream = (*mockTailLogEntriesClient)(nil)
 
-func TestGcpLoggingTailerNext_EmptyResponse(t *testing.T) {
-	// An empty-entries response (heartbeat or suppression info) must return nil, nil
-	// so the caller can continue looping without treating it as an error.
+func TestTailEntries_EmptyResponse(t *testing.T) {
+	// An empty-entries response (heartbeat or suppression info) must be yielded as an empty
+	// batch with a nil error, so the caller can continue looping without treating it as an error.
 	client := &mockTailLogEntriesClient{
 		responses: []*loggingpb.TailLogEntriesResponse{
 			{Entries: nil}, // empty — heartbeat
 		},
 	}
-	tailer := &gcpLoggingTailer{tleClient: client}
+	next, stop := iter.Pull2(tailEntries(context.Background(), client))
+	defer stop()
 
-	entry, err := tailer.Next(context.Background())
-	if err != nil {
-		t.Fatalf("Next() error = %v, want nil", err)
+	entries, err, ok := next()
+	if !ok {
+		t.Fatal("next() ok = false, want true")
 	}
-	if entry != nil {
-		t.Fatalf("Next() entry = %v, want nil", entry)
+	if err != nil {
+		t.Fatalf("next() error = %v, want nil", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("next() entries = %v, want empty", entries)
 	}
 }
 
-func TestGcpLoggingTailerNext_WithEntries(t *testing.T) {
-	// A response with entries should return the first entry and cache the rest.
+func TestTailEntries_WithEntries(t *testing.T) {
+	// A response with entries should be yielded as a single batch.
 	entries := []*loggingpb.LogEntry{
 		{InsertId: "entry1"},
 		{InsertId: "entry2"},
@@ -75,27 +80,22 @@ func TestGcpLoggingTailerNext_WithEntries(t *testing.T) {
 			{Entries: entries},
 		},
 	}
-	tailer := &gcpLoggingTailer{tleClient: client}
+	next, stop := iter.Pull2(tailEntries(context.Background(), client))
+	defer stop()
 
-	entry, err := tailer.Next(context.Background())
+	got, err, ok := next()
+	if !ok {
+		t.Fatal("next() ok = false, want true")
+	}
 	if err != nil {
-		t.Fatalf("Next() error = %v, want nil", err)
+		t.Fatalf("next() error = %v, want nil", err)
 	}
-	if entry == nil || entry.InsertId != "entry1" {
-		t.Fatalf("Next() entry = %v, want entry1", entry)
-	}
-
-	// Second call should return cached entry without calling Recv again.
-	entry, err = tailer.Next(context.Background())
-	if err != nil {
-		t.Fatalf("Next() error = %v, want nil", err)
-	}
-	if entry == nil || entry.InsertId != "entry2" {
-		t.Fatalf("Next() entry = %v, want entry2", entry)
+	if len(got) != 2 || got[0].InsertId != "entry1" || got[1].InsertId != "entry2" {
+		t.Fatalf("next() entries = %v, want [entry1 entry2]", got)
 	}
 }
 
-func TestGcpLoggingTailerNext_IdleTimeout(t *testing.T) {
+func TestTailEntries_IdleTimeout(t *testing.T) {
 	// A stalled stream (Recv never returns, no error, no data) must surface
 	// pkg.ErrIdleTimeout instead of blocking forever. Regression test for
 	// https://github.com/DefangLabs/defang/issues/2231.
@@ -104,32 +104,37 @@ func TestGcpLoggingTailerNext_IdleTimeout(t *testing.T) {
 	defer func() { tailIdleTimeout = orig }()
 
 	client := &mockTailLogEntriesClient{block: make(chan struct{})} // never closed: Recv blocks forever
-	tailer := &gcpLoggingTailer{tleClient: client}
+	next, stop := iter.Pull2(tailEntries(context.Background(), client))
+	defer stop()
 
-	entry, err := tailer.Next(context.Background())
-	if !errors.Is(err, pkg.ErrIdleTimeout) {
-		t.Fatalf("Next() error = %v, want ErrIdleTimeout", err)
+	_, err, ok := next()
+	if !ok {
+		t.Fatal("next() ok = false, want true")
 	}
-	if entry != nil {
-		t.Fatalf("Next() entry = %v, want nil", entry)
+	if !errors.Is(err, pkg.ErrIdleTimeout) {
+		t.Fatalf("next() error = %v, want ErrIdleTimeout", err)
 	}
 }
 
-func TestGcpLoggingTailerNext_ContextCanceled(t *testing.T) {
-	// If ctx is canceled before the idle timeout, Next must return the context error, not
+func TestTailEntries_ContextCanceled(t *testing.T) {
+	// If ctx is canceled before the idle timeout, the error must be the context error, not
 	// ErrIdleTimeout.
 	orig := tailIdleTimeout
 	tailIdleTimeout = time.Minute
 	defer func() { tailIdleTimeout = orig }()
 
 	client := &mockTailLogEntriesClient{block: make(chan struct{})} // never closed: Recv blocks forever
-	tailer := &gcpLoggingTailer{tleClient: client}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, err := tailer.Next(ctx)
+	next, stop := iter.Pull2(tailEntries(ctx, client))
+	defer stop()
+
+	_, err, ok := next()
+	if !ok {
+		t.Fatal("next() ok = false, want true")
+	}
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("Next() error = %v, want context.Canceled", err)
+		t.Fatalf("next() error = %v, want context.Canceled", err)
 	}
 }
