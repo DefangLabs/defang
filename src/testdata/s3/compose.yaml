@@ -1,0 +1,45 @@
+services:
+  objs:
+    image: minio/minio
+    x-defang-s3:
+      bucket: buzz-media-prod
+    ports:
+      - target: 9000
+        mode: host
+
+  wrongimage:
+    image: example
+    x-defang-s3:
+      bucket: wrong-image-bucket
+    ports:
+      - target: 9000
+        mode: host
+
+  noports:
+    image: minio/minio
+    x-defang-s3:
+      bucket: no-ports-bucket
+
+  # A digest-pinned MinIO anchor: proves GetImageRepo sees past the digest, so
+  # this port is moved to host mode instead of staying a public ingress port.
+  digestpin:
+    image: minio/minio@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    ports:
+      - target: 9000
+
+  noext:
+    image: minio/minio
+    ports:
+      - target: 9000
+        mode: host
+
+  buzz:
+    build: .
+    depends_on: [objs]
+
+  buzzpreset:
+    build: .
+    depends_on: [objs]
+    environment:
+      OBJS_BUCKET: my-own-bucket
+      OBJS_URL: http://custom-endpoint:9000
