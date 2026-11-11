@@ -53,28 +53,33 @@ func makeEstimateCmd() *cobra.Command {
 				estimateProvider = session.Stack.Provider
 			}
 
-			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
-			if global.Stack.Recipe == modes.RecipeUnspecified {
-				global.Stack.Recipe = modes.RecipeAffordable
+			// Use the stack's recipe (BYOC) or the --mode flag; default to affordable if unspecified.
+			recipe := global.Stack.Recipe
+			if previewProvider.Driver() != "playground" {
+				recipe = session.Stack.Recipe
+			}
+			// TODO: when mode is not specified, show an interactive prompt
+			if recipe == modes.RecipeUnspecified {
+				recipe = modes.RecipeAffordable
 			}
 			// The preview runs in the stack's region, so the estimate must use the same one.
-			if stackRegion := session.Stack.Region; stackRegion != "" {
-				if cmd.Flags().Changed("region") && region != stackRegion {
+			if explicit := cmd.Flags().Changed("region"); explicit {
+				if stackRegion := session.Stack.Region; stackRegion != "" && region != stackRegion {
 					return fmt.Errorf("--region %q does not match the stack's region %q", region, stackRegion)
 				}
-				region = stackRegion
-			}
-			if region == "" {
-				region = client.GetRegion(estimateProvider) // This sets the default region based on the provider
+			} else if session.Stack.Region != "" {
+				region = session.Stack.Region
+			} else {
+				region = client.GetRegion(estimateProvider) // the flag default may belong to another provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, estimateProvider, region, global.Stack.Recipe)
+			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, estimateProvider, region, recipe)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
 			term.Debugf("Estimate: %+v", estimate)
 
-			cli.PrintEstimate(global.Stack.Recipe, estimate, term.DefaultTerm)
+			cli.PrintEstimate(recipe, estimate, term.DefaultTerm)
 
 			return nil
 		},
