@@ -64,7 +64,11 @@ func makeEstimateCmd() *cobra.Command {
 			}
 			// The preview runs in the stack's region, so the estimate must use the same one.
 			if explicit := cmd.Flags().Changed("region"); explicit {
-				if stackRegion := session.Stack.Region; stackRegion != "" && region != stackRegion {
+				stackRegion := session.Stack.Region
+				if stackRegion == "" && previewProvider.Driver() != "playground" {
+					stackRegion = client.GetRegion(estimateProvider) // the preview provider's own default
+				}
+				if stackRegion != "" && region != stackRegion {
 					return fmt.Errorf("--region %q does not match the stack's region %q", region, stackRegion)
 				}
 			} else if session.Stack.Region != "" {
