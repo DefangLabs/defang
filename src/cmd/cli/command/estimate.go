@@ -47,6 +47,11 @@ func makeEstimateCmd() *cobra.Command {
 				return err
 			}
 			previewProvider := session.Provider
+			// For BYOC the preview runs on the stack's provider, so price for that one.
+			estimateProvider := global.Stack.Provider
+			if previewProvider.Driver() != "playground" {
+				estimateProvider = session.Stack.Provider
+			}
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if global.Stack.Recipe == modes.RecipeUnspecified {
@@ -54,16 +59,16 @@ func makeEstimateCmd() *cobra.Command {
 			}
 			// The preview runs in the stack's region, so the estimate must use the same one.
 			if stackRegion := session.Stack.Region; stackRegion != "" {
-				if region != "" && region != stackRegion {
+				if cmd.Flags().Changed("region") && region != stackRegion {
 					return fmt.Errorf("--region %q does not match the stack's region %q", region, stackRegion)
 				}
 				region = stackRegion
 			}
 			if region == "" {
-				region = client.GetRegion(global.Stack.Provider) // This sets the default region based on the provider
+				region = client.GetRegion(estimateProvider) // This sets the default region based on the provider
 			}
 
-			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, global.Stack.Provider, region, global.Stack.Recipe)
+			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, estimateProvider, region, global.Stack.Recipe)
 			if err != nil {
 				return fmt.Errorf("failed to run estimate: %w", err)
 			}
