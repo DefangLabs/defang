@@ -29,6 +29,8 @@ type previewLogProvider struct {
 	*mockDeployProvider
 }
 
+func (previewLogProvider) Driver() string { return "playground" }
+
 func (previewLogProvider) QueryLogs(ctx context.Context, req *defangv1.TailRequest) (iter.Seq2[*defangv1.TailResponse, error], error) {
 	return func(yield func(*defangv1.TailResponse, error) bool) {}, nil
 }

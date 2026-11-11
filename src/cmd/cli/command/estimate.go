@@ -32,6 +32,7 @@ func makeEstimateCmd() *cobra.Command {
 			if global.Stack.Provider == client.ProviderAuto {
 				providerID, err := interactiveSelectProvider([]client.ProviderID{
 					client.ProviderAWS,
+					client.ProviderAzure,
 					client.ProviderGCP,
 				})
 				if err != nil {
@@ -40,7 +41,12 @@ func makeEstimateCmd() *cobra.Command {
 				global.Stack.Provider = providerID
 			}
 
-			var previewProvider client.Provider = &client.PlaygroundProvider{FabricClient: global.Client}
+			// The preview runs in the user's own cloud account, so it needs the same credentials as a deployment.
+			session, err := newCommandSession(cmd)
+			if err != nil {
+				return err
+			}
+			previewProvider := session.Provider
 
 			// default to development mode if not specified; TODO: when mode is not specified, show an interactive prompt
 			if global.Stack.Recipe == modes.RecipeUnspecified {
