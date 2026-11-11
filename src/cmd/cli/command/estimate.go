@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -66,7 +67,9 @@ func makeEstimateCmd() *cobra.Command {
 			// The preview runs in the stack's region, so the estimate must use the same one.
 			stackRegion := session.Stack.Region
 			if stackRegion == "" && previewProvider.Driver() != "playground" {
-				stackRegion = resolvedPreviewRegion(ctx, previewProvider, estimateProvider)
+				if stackRegion, err = resolvedPreviewRegion(ctx, previewProvider); err != nil {
+					return err
+				}
 			}
 			region, err = pickEstimateRegion(region, cmd.Flags().Changed("region"), stackRegion, estimateProvider)
 			if err != nil {
@@ -91,12 +94,17 @@ func makeEstimateCmd() *cobra.Command {
 }
 
 // resolvedPreviewRegion returns the region the BYOC preview provider will really use
-// (it may come from the cloud profile or AWS_DEFAULT_REGION), falling back to the provider default.
-func resolvedPreviewRegion(ctx context.Context, previewProvider client.Provider, providerID client.ProviderID) string {
-	if info, err := previewProvider.AccountInfo(ctx); err == nil && info != nil && info.Region != "" {
-		return info.Region
+// (it may come from the cloud profile or AWS_DEFAULT_REGION). It fails rather than guess,
+// because pricing a different region than the preview runs in would be wrong.
+func resolvedPreviewRegion(ctx context.Context, previewProvider client.Provider) (string, error) {
+	info, err := previewProvider.AccountInfo(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to determine the preview region: %w", err)
 	}
-	return client.GetRegion(providerID)
+	if info == nil || info.Region == "" {
+		return "", errors.New("failed to determine the preview region: provider reported none")
+	}
+	return info.Region, nil
 }
 
 // pickEstimateRegion chooses the pricing region. An explicit --region must match the stack's region, if known.

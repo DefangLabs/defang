@@ -181,21 +181,22 @@ func (p regionProvider) AccountInfo(context.Context) (*client.AccountInfo, error
 }
 
 func TestResolvedPreviewRegion(t *testing.T) {
-	t.Setenv("AWS_REGION", "")
-	os.Unsetenv("AWS_REGION") // restored by t.Setenv cleanup
+	t.Setenv("AWS_DEFAULT_REGION", "eu-west-1") // must not be silently replaced by the static default
 	tests := []struct {
-		name string
-		p    regionProvider
-		want string
+		name    string
+		p       regionProvider
+		want    string
+		wantErr bool
 	}{
-		{"uses provider's resolved region", regionProvider{info: &client.AccountInfo{Region: "eu-west-1"}}, "eu-west-1"},
-		{"falls back on error", regionProvider{err: errors.New("no creds")}, client.RegionDefaultAWS},
-		{"falls back on empty region", regionProvider{info: &client.AccountInfo{}}, client.RegionDefaultAWS},
+		{"uses provider's resolved region", regionProvider{info: &client.AccountInfo{Region: "eu-west-1"}}, "eu-west-1", false},
+		{"errors when AccountInfo fails", regionProvider{err: errors.New("sts timeout")}, "", true},
+		{"errors on empty region", regionProvider{info: &client.AccountInfo{}}, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := resolvedPreviewRegion(t.Context(), tt.p, client.ProviderAWS); got != tt.want {
-				t.Errorf("got %q, want %q", got, tt.want)
+			got, err := resolvedPreviewRegion(t.Context(), tt.p)
+			if (err != nil) != tt.wantErr || got != tt.want {
+				t.Errorf("got (%q, %v), want (%q, err=%v)", got, err, tt.want, tt.wantErr)
 			}
 		})
 	}
