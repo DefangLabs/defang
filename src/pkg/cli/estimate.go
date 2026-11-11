@@ -44,46 +44,38 @@ func GeneratePreview(ctx context.Context, project *compose.Project, fabric clien
 	os.Setenv("DEFANG_JSON", "1")             // HACK: always show JSON output for estimate
 	since := time.Now().Add(-1 * time.Minute) // fetch logs since one minute ago to account for clock drift
 
-	fixedProject := project.WithoutUnnecessaryResources()
-	if err := compose.FixupServices(ctx, previewProvider, fixedProject, compose.UploadModeEstimate); err != nil {
-		return "", err
-	}
-
-	composeData, err := compose.MarshalYAML(fixedProject)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal compose project: %w", err)
-	}
-
-	term.Debugf("Fixedup project: %s", string(composeData))
-
-	recipeMsg, err := getRecipe(ctx, fabric, recipe)
-	if err != nil {
-		return "", fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
-	}
-	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
-	resp, err := fabric.Preview(ctx, &defangv1.PreviewRequest{
-		Provider:    estimateProviderID.Value(),
-		Mode:        recipe.Mode().Value(),
-		Region:      region,
-		Compose:     composeData,
-		ProjectName: project.Name,
-		Recipe:      recipeMsg,
-	})
-	if err != nil {
-		return "", err
+	var etag string
+	if previewProvider.Driver() == "playground" {
+		var err error
+		etag, err = previewViaFabric(ctx, project, fabric, previewProvider, estimateProviderID, recipe, region)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		// BYOC: run the preview with the CD task in the user's own cloud account.
+		resp, _, err := ComposeUp(ctx, fabric, previewProvider, nil, ComposeUpParams{
+			Project:    project,
+			Recipe:     recipe,
+			UploadMode: compose.UploadModeEstimate,
+		})
+		if err != nil {
+			return "", err
+		}
+		etag = resp.Etag
 	}
 
 	term.Info("Generating deployment preview, this may take a few minutes...")
 	var pulumiPreviewLogLines []string
 	tailOptions := TailOptions{
-		Deployment: resp.Etag,
+		Deployment: etag,
+		Stack:      previewProvider.GetStackName(),
 		Follow:     true,
 		LogType:    logs.LogTypeCD,
 		Since:      since,
 		Verbose:    true,
 	}
 
-	err = streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
+	err := streamLogs(ctx, previewProvider, project.Name, tailOptions, func(entry *defangv1.LogEntry, options *TailOptions, t *term.Term) error {
 		if strings.HasPrefix(entry.Message, "Preview succeeded") {
 			return io.EOF
 		} else if strings.HasPrefix(entry.Message, "Preview failed") {
@@ -178,4 +170,37 @@ func prepareEstimateLineItemTableItems(lineItems []*defangv1.EstimateLineItem) [
 	})
 
 	return tableItems
+}
+
+// previewViaFabric starts the preview on the Defang Playground through Fabric.
+func previewViaFabric(ctx context.Context, project *compose.Project, fabric client.FabricClient, previewProvider client.Provider, estimateProviderID client.ProviderID, recipe modes.Recipe, region string) (string, error) {
+	fixedProject := project.WithoutUnnecessaryResources()
+	if err := compose.FixupServices(ctx, previewProvider, fixedProject, compose.UploadModeEstimate); err != nil {
+		return "", err
+	}
+
+	composeData, err := compose.MarshalYAML(fixedProject)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal compose project: %w", err)
+	}
+
+	term.Debugf("Fixedup project: %s", string(composeData))
+
+	recipeMsg, err := getRecipe(ctx, fabric, recipe)
+	if err != nil {
+		return "", fmt.Errorf("failed to get recipe for deployment mode %q: %w", recipe, err)
+	}
+	// Allow estimate/preview with an inactive recipe so teams can evaluate it before activating.
+	resp, err := fabric.Preview(ctx, &defangv1.PreviewRequest{
+		Provider:    estimateProviderID.Value(),
+		Mode:        recipe.Mode().Value(),
+		Region:      region,
+		Compose:     composeData,
+		ProjectName: project.Name,
+		Recipe:      recipeMsg,
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.Etag, nil
 }
