@@ -1,10 +1,14 @@
 package command
 
 import (
+	"context"
+	"errors"
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg/cli"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
 	"github.com/DefangLabs/defang/src/pkg/modes"
 	"github.com/DefangLabs/defang/src/pkg/term"
 	_type "github.com/DefangLabs/defang/src/protos/google/type"
@@ -163,5 +167,63 @@ To estimate other modes, use defang estimate --mode=AFFORDABLE|BALANCED|HIGH_AVA
 
 	if actualOutput != expectedOutput {
 		t.Errorf("Expected output did not match actual output. diff:\n%s", diff.LineDiff(expectedOutput, actualOutput))
+	}
+}
+
+type regionProvider struct {
+	client.Provider
+	info *client.AccountInfo
+	err  error
+}
+
+func (p regionProvider) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	return p.info, p.err
+}
+
+func TestResolvedPreviewRegion(t *testing.T) {
+	t.Setenv("AWS_REGION", "")
+	os.Unsetenv("AWS_REGION") // restored by t.Setenv cleanup
+	tests := []struct {
+		name string
+		p    regionProvider
+		want string
+	}{
+		{"uses provider's resolved region", regionProvider{info: &client.AccountInfo{Region: "eu-west-1"}}, "eu-west-1"},
+		{"falls back on error", regionProvider{err: errors.New("no creds")}, client.RegionDefaultAWS},
+		{"falls back on empty region", regionProvider{info: &client.AccountInfo{}}, client.RegionDefaultAWS},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resolvedPreviewRegion(t.Context(), tt.p, client.ProviderAWS); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPickEstimateRegion(t *testing.T) {
+	t.Setenv("AWS_REGION", "")
+	os.Unsetenv("AWS_REGION") // restored by t.Setenv cleanup
+	tests := []struct {
+		name        string
+		flag        string
+		explicit    bool
+		stackRegion string
+		want        string
+		wantErr     bool
+	}{
+		{"explicit matches", "eu-west-1", true, "eu-west-1", "eu-west-1", false},
+		{"explicit mismatch", "us-west-2", true, "eu-west-1", "", true},
+		{"explicit, unknown stack region", "ap-south-1", true, "", "ap-south-1", false},
+		{"omitted uses stack region", "us-west-2", false, "eu-west-1", "eu-west-1", false},
+		{"omitted, no stack region uses provider default", "westus", false, "", client.RegionDefaultAWS, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := pickEstimateRegion(tt.flag, tt.explicit, tt.stackRegion, client.ProviderAWS)
+			if (err != nil) != tt.wantErr || got != tt.want {
+				t.Errorf("got (%q, %v), want (%q, err=%v)", got, err, tt.want, tt.wantErr)
+			}
+		})
 	}
 }

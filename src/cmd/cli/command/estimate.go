@@ -1,6 +1,7 @@
 package command
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -63,18 +64,13 @@ func makeEstimateCmd() *cobra.Command {
 				recipe = modes.RecipeAffordable
 			}
 			// The preview runs in the stack's region, so the estimate must use the same one.
-			if explicit := cmd.Flags().Changed("region"); explicit {
-				stackRegion := session.Stack.Region
-				if stackRegion == "" && previewProvider.Driver() != "playground" {
-					stackRegion = client.GetRegion(estimateProvider) // the preview provider's own default
-				}
-				if stackRegion != "" && region != stackRegion {
-					return fmt.Errorf("--region %q does not match the stack's region %q", region, stackRegion)
-				}
-			} else if session.Stack.Region != "" {
-				region = session.Stack.Region
-			} else {
-				region = client.GetRegion(estimateProvider) // the flag default may belong to another provider
+			stackRegion := session.Stack.Region
+			if stackRegion == "" && previewProvider.Driver() != "playground" {
+				stackRegion = resolvedPreviewRegion(ctx, previewProvider, estimateProvider)
+			}
+			region, err = pickEstimateRegion(region, cmd.Flags().Changed("region"), stackRegion, estimateProvider)
+			if err != nil {
+				return err
 			}
 
 			estimate, err := cli.RunEstimate(ctx, project, global.Client, previewProvider, estimateProvider, region, recipe)
@@ -92,6 +88,30 @@ func makeEstimateCmd() *cobra.Command {
 	estimateCmd.Flags().VarP(&global.Stack.Recipe, "mode", "m", fmt.Sprintf("deployment mode; one of %v", modes.AllDeploymentModes()))
 	estimateCmd.Flags().StringVarP(&global.Stack.Region, "region", "r", global.Stack.Region, "which cloud region to estimate")
 	return estimateCmd
+}
+
+// resolvedPreviewRegion returns the region the BYOC preview provider will really use
+// (it may come from the cloud profile or AWS_DEFAULT_REGION), falling back to the provider default.
+func resolvedPreviewRegion(ctx context.Context, previewProvider client.Provider, providerID client.ProviderID) string {
+	if info, err := previewProvider.AccountInfo(ctx); err == nil && info != nil && info.Region != "" {
+		return info.Region
+	}
+	return client.GetRegion(providerID)
+}
+
+// pickEstimateRegion chooses the pricing region. An explicit --region must match the stack's region, if known.
+func pickEstimateRegion(flagRegion string, explicit bool, stackRegion string, providerID client.ProviderID) (string, error) {
+	switch {
+	case explicit:
+		if stackRegion != "" && flagRegion != stackRegion {
+			return "", fmt.Errorf("--region %q does not match the stack's region %q", flagRegion, stackRegion)
+		}
+		return flagRegion, nil
+	case stackRegion != "":
+		return stackRegion, nil
+	default:
+		return client.GetRegion(providerID), nil // the flag default may belong to another provider
+	}
 }
 
 var providerDescription = map[client.ProviderID]string{
