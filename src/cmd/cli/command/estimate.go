@@ -52,6 +52,13 @@ func makeEstimateCmd() *cobra.Command {
 			if global.Stack.Recipe == modes.RecipeUnspecified {
 				global.Stack.Recipe = modes.RecipeAffordable
 			}
+			// The preview runs in the stack's region, so the estimate must use the same one.
+			if stackRegion := session.Stack.Region; stackRegion != "" {
+				if region != "" && region != stackRegion {
+					return fmt.Errorf("--region %q does not match the stack's region %q", region, stackRegion)
+				}
+				region = stackRegion
+			}
 			if region == "" {
 				region = client.GetRegion(global.Stack.Provider) // This sets the default region based on the provider
 			}
