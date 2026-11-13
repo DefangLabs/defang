@@ -1,0 +1,40 @@
+name: CI gate
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v6
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+      - name: Run Go tests
+        working-directory: src
+        run: go test -race -short ./...
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/npm-build
+      - name: Run npm tests
+        working-directory: pkgs/npm
+        run: npm test
+  ci:
+    name: ci
+    if: always()
+    needs: [go, npm]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Require Go and npm tests
+        env:
+          GO: ${{ needs.go.result }}
+          NPM: ${{ needs.npm.result }}
+        run: test "$GO" = success && test "$NPM" = success
