@@ -537,12 +537,13 @@ const gatewayKeyConfig = "LITELLM_MASTER_KEY"
 // ensureGatewayKey creates the gateway key config with a random value if a
 // managed model gateway needs it and the project does not have it yet. It is
 // generated once per project and stack and then reused, so redeploying does
-// not restart every service that calls the gateway.
+// not restart every service that calls the gateway. Any service may be the
+// gateway: one from the deprecated provider syntax has no x-defang-llm, and a
+// key the user declared themselves was already checked by config validation.
 func ensureGatewayKey(ctx context.Context, provider client.Provider, project *composeTypes.Project, configNames []string, listErr error, upload UploadMode) error {
 	needed := false
 	for _, svccfg := range project.Services {
-		_, llm := svccfg.Extensions["x-defang-llm"]
-		if key, ok := svccfg.Environment[gatewayKeyConfig]; ok && key == nil && llm {
+		if key, ok := svccfg.Environment[gatewayKeyConfig]; ok && key == nil {
 			needed = true
 			break
 		}

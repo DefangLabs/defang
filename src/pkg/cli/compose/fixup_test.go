@@ -504,10 +504,12 @@ func TestFixupServicesGatewayKey(t *testing.T) {
 		listErr    error
 		upload     UploadMode
 		appEnv     composeTypes.MappingWithEquals
+		deprecated bool // provider: type: model instead of models:
 		wantErr    bool
 		wantCreate bool
 	}{
 		{name: "creates a missing key", upload: UploadModeDigest, wantCreate: true},
+		{name: "creates a missing key for the deprecated provider syntax", deprecated: true, upload: UploadModeDigest, wantCreate: true},
 		{name: "creates a missing key for a preview", upload: UploadModePreview, wantCreate: true},
 		{name: "keeps an existing key", configs: []string{"LITELLM_MASTER_KEY"}, upload: UploadModeDigest},
 		{name: "dry run creates nothing", upload: UploadModeIgnore},
@@ -531,6 +533,13 @@ func TestFixupServicesGatewayKey(t *testing.T) {
 						Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
 					},
 				},
+			}
+			if tt.deprecated {
+				project.Models = nil
+				project.Services["llm"] = composeTypes.ServiceConfig{
+					Name:     "llm",
+					Provider: &composeTypes.ServiceProviderConfig{Type: "model", Options: composeTypes.MultiOptions{"model": {"ai/model"}}},
+				}
 			}
 
 			err := FixupServices(t.Context(), provider, project, tt.upload)
