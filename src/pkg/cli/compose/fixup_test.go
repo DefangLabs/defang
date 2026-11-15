@@ -1,11 +1,14 @@
 package compose
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -196,12 +199,46 @@ func TestAccessGatewayChatLarge(t *testing.T) {
 func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 	info := &client.AccountInfo{}
 
-	t.Run("no OPENAI_API_KEY uses default key", func(t *testing.T) {
-		proj := &composeTypes.Project{Networks: map[string]composeTypes.NetworkConfig{}, Services: composeTypes.Services{}}
+	t.Run("no OPENAI_API_KEY reads the key from config", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:     "app",
+					Image:    "myapp",
+					Models:   map[string]*composeTypes.ServiceModelConfig{"llm": nil},
+					Networks: map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
 		svccfg := newLLMService()
 		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
 
-		assert.Equal(t, "networkisalreadyprivate", *svccfg.Environment["LITELLM_MASTER_KEY"])
+		require.Contains(t, svccfg.Environment, "LITELLM_MASTER_KEY")
+		assert.Nil(t, svccfg.Environment["LITELLM_MASTER_KEY"])
+		assert.Equal(t, "${LITELLM_MASTER_KEY}", *proj.Services["app"].Environment["OPENAI_API_KEY"])
+	})
+
+	t.Run("OPENAI_API_KEY from config on dependent service is interpolated", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:  "app",
+					Image: "myapp",
+					DependsOn: map[string]composeTypes.ServiceDependency{
+						"llm": {Condition: composeTypes.ServiceConditionStarted, Required: true},
+					},
+					Environment: composeTypes.MappingWithEquals{"OPENAI_API_KEY": nil},
+					Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+
+		assert.Equal(t, "${OPENAI_API_KEY}", *svccfg.Environment["LITELLM_MASTER_KEY"])
+		assert.Nil(t, proj.Services["app"].Environment["OPENAI_API_KEY"])
 	})
 
 	t.Run("OPENAI_API_KEY on dependent service propagates to LITELLM_MASTER_KEY", func(t *testing.T) {
@@ -245,6 +282,25 @@ func TestMakeAccessGatewayServiceLiteLLMMasterKey(t *testing.T) {
 		app := proj.Services["app"]
 		require.Contains(t, app.Environment, "OPENAI_API_KEY")
 		assert.Equal(t, masterKey, *app.Environment["OPENAI_API_KEY"])
+	})
+
+	t.Run("LITELLM_MASTER_KEY from config on service is passed to consumers", func(t *testing.T) {
+		proj := &composeTypes.Project{
+			Networks: map[string]composeTypes.NetworkConfig{},
+			Services: composeTypes.Services{
+				"app": {
+					Name:     "app",
+					Image:    "myapp",
+					Models:   map[string]*composeTypes.ServiceModelConfig{"llm": nil},
+					Networks: map[string]*composeTypes.ServiceNetworkConfig{},
+				},
+			},
+		}
+		svccfg := newLLMService()
+		svccfg.Environment["LITELLM_MASTER_KEY"] = nil
+		makeAccessGatewayService(&svccfg, proj, "ai/model", info)
+
+		assert.Equal(t, "${LITELLM_MASTER_KEY}", *proj.Services["app"].Environment["OPENAI_API_KEY"])
 	})
 
 	t.Run("existing LITELLM_MASTER_KEY on service is preserved", func(t *testing.T) {
@@ -420,6 +476,81 @@ func TestFixupImageAndBuildPullPolicy(t *testing.T) {
 			} else {
 				assert.Nil(t, svc.Build, "expected build config to be dropped in favor of the published image")
 			}
+		})
+	}
+}
+
+type gatewayKeyProvider struct {
+	client.MockProvider
+	configs []string
+	listErr error
+	puts    []*defangv1.PutConfigRequest
+}
+
+func (p *gatewayKeyProvider) ListConfig(context.Context, *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	return &defangv1.Secrets{Names: p.configs}, p.listErr
+}
+
+func (p *gatewayKeyProvider) PutConfig(_ context.Context, req *defangv1.PutConfigRequest) error {
+	p.puts = append(p.puts, req)
+	return nil
+}
+
+func TestFixupServicesGatewayKey(t *testing.T) {
+	appKey := "sk-app" //nolint:gosec
+	tests := []struct {
+		name       string
+		configs    []string
+		listErr    error
+		upload     UploadMode
+		appEnv     composeTypes.MappingWithEquals
+		wantErr    bool
+		wantCreate bool
+	}{
+		{name: "creates a missing key", upload: UploadModeDigest, wantCreate: true},
+		{name: "creates a missing key for a preview", upload: UploadModePreview, wantCreate: true},
+		{name: "keeps an existing key", configs: []string{"LITELLM_MASTER_KEY"}, upload: UploadModeDigest},
+		{name: "dry run creates nothing", upload: UploadModeIgnore},
+		{name: "estimate creates nothing", upload: UploadModeEstimate},
+		{name: "config list failure is an error", listErr: errors.New("denied"), upload: UploadModeDigest, wantErr: true},
+		{name: "app key needs no config", upload: UploadModeDigest, appEnv: composeTypes.MappingWithEquals{"OPENAI_API_KEY": &appKey}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			provider := &gatewayKeyProvider{configs: tt.configs, listErr: tt.listErr}
+			project := &composeTypes.Project{
+				Name:     "proj",
+				Networks: composeTypes.Networks{},
+				Models:   composeTypes.Models{"llm": {Model: "ai/model"}},
+				Services: composeTypes.Services{
+					"app": {
+						Name:        "app",
+						Image:       "myapp",
+						DependsOn:   composeTypes.DependsOnConfig{"llm": {Condition: composeTypes.ServiceConditionStarted, Required: true}},
+						Environment: tt.appEnv,
+						Networks:    map[string]*composeTypes.ServiceNetworkConfig{},
+					},
+				},
+			}
+
+			err := FixupServices(t.Context(), provider, project, tt.upload)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Empty(t, provider.puts, "an existing key must never be overwritten")
+				return
+			}
+			require.NoError(t, err)
+			if !tt.wantCreate {
+				assert.Empty(t, provider.puts)
+				return
+			}
+			require.Len(t, provider.puts, 1)
+			put := provider.puts[0]
+			assert.Equal(t, "proj", put.Project)
+			assert.Equal(t, "LITELLM_MASTER_KEY", put.Name)
+			assert.GreaterOrEqual(t, len(put.Value), 26)
+			assert.Nil(t, project.Services["llm"].Environment["LITELLM_MASTER_KEY"])
+			assert.Equal(t, "${LITELLM_MASTER_KEY}", *project.Services["app"].Environment["OPENAI_API_KEY"])
 		})
 	}
 }

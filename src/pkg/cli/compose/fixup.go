@@ -2,6 +2,7 @@ package compose
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,9 +31,9 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 	}
 
 	// Preload the current config so we can detect which environment variables should be passed as "secrets"
-	config, err := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
-	if err != nil {
-		term.Debugf("failed to load config: %v", err)
+	config, listErr := provider.ListConfig(ctx, &defangv1.ListConfigsRequest{Project: project.Name})
+	if listErr != nil {
+		term.Debugf("failed to load config: %v", listErr)
 		config = &defangv1.Secrets{}
 	}
 	slices.Sort(config.Names) // sort for binary search
@@ -109,6 +110,10 @@ func FixupServices(ctx context.Context, provider client.Provider, project *compo
 		}
 		svccfg.Extensions["x-defang-llm"] = true
 		project.Services[svccfg.Name] = *svccfg
+	}
+
+	if err := ensureGatewayKey(ctx, provider, project, config.Names, listErr, upload); err != nil {
+		return err
 	}
 
 	svcNameReplacer := NewServiceNameReplacer(ctx, provider, project)
@@ -492,31 +497,68 @@ func configureAccessGateway(svccfg *composeTypes.ServiceConfig, project *compose
 	svccfg.Provider = nil // remove "provider:" because current backend will not accept it
 	project.Networks[modelProviderNetwork] = composeTypes.NetworkConfig{Name: modelProviderNetwork}
 
-	masterKey, exists := svccfg.Environment["LITELLM_MASTER_KEY"]
+	masterKey, exists := svccfg.Environment[gatewayKeyConfig]
 	if !exists {
 		openAIKey := ""
 		for _, service := range project.Services {
 			if _, ok := service.DependsOn[svccfg.Name]; ok {
 				if key, ok := service.Environment["OPENAI_API_KEY"]; ok {
+					value := "${OPENAI_API_KEY}" // no value: the key is in config
+					if key != nil {
+						value = *key
+					}
 					if openAIKey == "" {
-						openAIKey = *key
-					} else if *key != openAIKey {
+						openAIKey = value
+					} else if value != openAIKey {
 						term.Errorf("multiple different OPENAI_API_KEY values found in services depending on %q", svccfg.Name)
 						break
 					}
 				}
 			}
 		}
-		if openAIKey == "" {
-			key := "networkisalreadyprivate"
-			masterKey = &key
-		} else {
+		if openAIKey != "" {
 			masterKey = &openAIKey
 		}
-		svccfg.Environment["LITELLM_MASTER_KEY"] = masterKey
+		svccfg.Environment[gatewayKeyConfig] = masterKey
+	}
+	if masterKey == nil {
+		// The gateway reads its key from config (see ensureGatewayKey); the
+		// services that call it get the same value through interpolation.
+		key := "${" + gatewayKeyConfig + "}"
+		masterKey = &key
 	}
 
 	return model, masterKey
+}
+
+// gatewayKeyConfig is the config that holds a managed model gateway's key.
+const gatewayKeyConfig = "LITELLM_MASTER_KEY"
+
+// ensureGatewayKey creates the gateway key config with a random value if a
+// managed model gateway needs it and the project does not have it yet. It is
+// generated once per project and stack and then reused, so redeploying does
+// not restart every service that calls the gateway.
+func ensureGatewayKey(ctx context.Context, provider client.Provider, project *composeTypes.Project, configNames []string, listErr error, upload UploadMode) error {
+	needed := false
+	for _, svccfg := range project.Services {
+		_, llm := svccfg.Extensions["x-defang-llm"]
+		if key, ok := svccfg.Environment[gatewayKeyConfig]; ok && key == nil && llm {
+			needed = true
+			break
+		}
+	}
+	if !needed || upload == UploadModeIgnore || upload == UploadModeEstimate {
+		return nil
+	}
+	if listErr != nil {
+		// Never overwrite a key that may exist: running services use it.
+		return fmt.Errorf("checking for config %q: %w", gatewayKeyConfig, listErr)
+	}
+	if _, ok := slices.BinarySearch(configNames, gatewayKeyConfig); ok {
+		return nil
+	}
+	term.Infof("Generating config %q for the model gateway", gatewayKeyConfig)
+	return provider.PutConfig(ctx, &defangv1.PutConfigRequest{Project: project.Name, Name: gatewayKeyConfig, Value: rand.Text()})
 }
 
 // wireDependentServices injects URL, model, and API-key env vars and adds the

@@ -12,7 +12,7 @@ ai_runner:
                 memory: "2147483648"
     environment:
         DEBUG: "true"
-        LITELLM_MASTER_KEY: networkisalreadyprivate
+        LITELLM_MASTER_KEY: null
     image: litellm/litellm:v1.92.0
     networks:
         model_provider_private: null
@@ -28,7 +28,7 @@ chat:
     environment:
         AI_RUNNER_MODEL: ai/smollm2
         AI_RUNNER_URL: http://mock-ai-runner:4000/v1/
-        OPENAI_API_KEY: networkisalreadyprivate
+        OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
     image: my-chat-app
     networks:
         default: null
