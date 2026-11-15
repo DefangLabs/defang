@@ -215,6 +215,10 @@ func makeStackRemoveCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("could not load stack parameters: %w", err)
 			}
+			// The provider reads its region from the environment, as it does for commands that select the stack through a session
+			if err := stacks.LoadStackEnv(*stack, true); err != nil {
+				return fmt.Errorf("failed to load stack env: %w", err)
+			}
 			provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
 			if !force {
 				// RemoveStack lists deployments through the provider, which needs credentials
