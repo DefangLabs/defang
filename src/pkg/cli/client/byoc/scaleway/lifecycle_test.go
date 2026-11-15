@@ -156,10 +156,11 @@ func TestLegacyProjectReadbackAndServiceLookup(t *testing.T) {
 
 func TestCDTeardownFiltersUnrelatedResourcesAndCollectsFailures(t *testing.T) {
 	for _, tc := range []struct {
-		name         string
-		cached, fail bool
+		name                string
+		cached, fail, paged bool
 	}{
 		{name: "fresh client"},
+		{name: "fresh client with the stack's job and token on page 2", paged: true},
 		{name: "cached client", cached: true},
 		{name: "fresh client errors", fail: true},
 		{name: "cached client errors", cached: true, fail: true},
@@ -181,8 +182,18 @@ func TestCDTeardownFiltersUnrelatedResourcesAndCollectsFailures(t *testing.T) {
 					return jsonResponse(`{}`), nil
 				}
 				switch {
+				case strings.HasSuffix(req.URL.Path, "/job-definitions") && tc.paged:
+					if req.URL.Query().Get("page") == "2" {
+						return jsonResponse(`{"job_definitions":[{"id":"current-job","name":"defang-cd-prod"}],"total_count":3}`), nil
+					}
+					return jsonResponse(`{"job_definitions":[{"id":"legacy-job","name":"defang-cd"},{"id":"unrelated-stack","name":"defang-cd-other"}],"total_count":3}`), nil
 				case strings.HasSuffix(req.URL.Path, "/job-definitions"):
 					return jsonResponse(`{"job_definitions":[{"id":"legacy-job","name":"defang-cd"},{"id":"current-job","name":"defang-cd-prod"},{"id":"unrelated-stack","name":"defang-cd-other"}]}`), nil
+				case strings.HasSuffix(req.URL.Path, "/tokens") && tc.paged:
+					if req.URL.Query().Get("page") == "2" {
+						return jsonResponse(`{"tokens":[{"id":"cd-token","name":"defang-cd-prod-logs"}],"total_count":2}`), nil
+					}
+					return jsonResponse(`{"tokens":[{"id":"unrelated-token","name":"defang-cd-other-logs"}],"total_count":2}`), nil
 				case strings.HasSuffix(req.URL.Path, "/tokens"):
 					return jsonResponse(`{"tokens":[{"id":"cd-token","name":"defang-cd-prod-logs"},{"id":"unrelated-token","name":"defang-cd-other-logs"}]}`), nil
 				case strings.Contains(req.URL.Path, "/secret-manager/"):
