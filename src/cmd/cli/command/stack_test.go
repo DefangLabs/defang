@@ -454,3 +454,41 @@ func TestStackExists(t *testing.T) {
 		})
 	}
 }
+
+func TestStackRemoveCmdUsesStackRegion(t *testing.T) {
+	origClient := global.Client
+	origNI := global.NonInteractive
+	t.Cleanup(func() {
+		global.Client = origClient
+		global.NonInteractive = origNI
+	})
+	global.NonInteractive = true
+	global.Client = client.MockFabricClient{}
+
+	t.Chdir(t.TempDir())
+	os.WriteFile("compose.yaml", []byte(testComposeYaml), 0644)
+	params := stacks.Parameters{
+		Name:     "amsstack",
+		Provider: client.ProviderScaleway,
+		Region:   "nl-ams",
+		Recipe:   modes.RecipeAffordable,
+	}
+	_, err := stacks.CreateInDirectory(".", params)
+	assert.NoError(t, err)
+	for key := range params.ToMap() {
+		os.Unsetenv(key)
+	}
+	t.Cleanup(func() {
+		for key := range params.ToMap() {
+			os.Unsetenv(key)
+		}
+	})
+	t.Setenv("SCW_DEFAULT_REGION", "fr-par")
+
+	stackRemoveCmd := makeStackRemoveCmd()
+	stackRemoveCmd.SetContext(t.Context())
+	stackRemoveCmd.Flags().Set("force", "true")
+
+	assert.NoError(t, stackRemoveCmd.RunE(stackRemoveCmd, []string{"amsstack"}))
+	assert.Equal(t, "nl-ams", os.Getenv("SCW_DEFAULT_REGION"))
+}
