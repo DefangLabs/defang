@@ -74,7 +74,7 @@ jobs:
           go-version-file: src/go.mod
           cache-dependency-path: src/go.sum
         # Execute goreleaser nightly run (see .goreleaser.yml nightly for details)
-      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
         if: steps.check.outputs.changed == 'true'
         with:
           distribution: goreleaser-pro
