@@ -454,3 +454,45 @@ func TestStackExists(t *testing.T) {
 		})
 	}
 }
+
+func TestStackRemoveCmdUsesStackRegion(t *testing.T) {
+	origClient := global.Client
+	origNI := global.NonInteractive
+	origNewProvider := newStackProvider
+	t.Cleanup(func() {
+		global.Client = origClient
+		global.NonInteractive = origNI
+		newStackProvider = origNewProvider
+	})
+	global.NonInteractive = true
+	global.Client = client.MockFabricClient{}
+
+	t.Chdir(t.TempDir())
+	os.WriteFile("compose.yaml", []byte(testComposeYaml), 0644)
+	params := stacks.Parameters{
+		Name:     "amsstack",
+		Provider: client.ProviderScaleway,
+		Region:   "nl-ams",
+		Recipe:   modes.RecipeAffordable,
+	}
+	_, err := stacks.CreateInDirectory(".", params)
+	assert.NoError(t, err)
+	// t.Setenv restores each variable's prior value, including unset, after LoadStackEnv overwrites it
+	for key := range params.ToMap() {
+		t.Setenv(key, os.Getenv(key))
+	}
+	t.Setenv("SCW_DEFAULT_REGION", "fr-par")
+
+	var providerRegion string
+	newStackProvider = func(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
+		providerRegion = os.Getenv("SCW_DEFAULT_REGION")
+		return origNewProvider(ctx, providerID, fabricClient, stack)
+	}
+
+	stackRemoveCmd := makeStackRemoveCmd()
+	stackRemoveCmd.SetContext(t.Context())
+	stackRemoveCmd.Flags().Set("force", "true")
+
+	assert.NoError(t, stackRemoveCmd.RunE(stackRemoveCmd, []string{"amsstack"}))
+	assert.Equal(t, "nl-ams", providerRegion)
+}
