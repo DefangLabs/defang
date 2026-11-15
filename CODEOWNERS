@@ -8,4 +8,4 @@
 /src/**       @lionello @defangdevs
 
 # Packaging with Nix
-/pkgs/defang/**   @lionello
+/pkgs/defang/**   @lionello @defangdevs
