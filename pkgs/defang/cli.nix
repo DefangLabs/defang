@@ -8,7 +8,7 @@
   pname = "defang-cli";
   version = "git";
   src = lib.cleanSource ../../src;
-  vendorHash = "sha256-nEKl8y8Rrqce88unHKS6YSKnw+gbCMQbedUSgvx5haU=";
+  vendorHash = "sha256-WK60G+AvT+tYCgKckhq6JDjOWrqHkpk5clRdsh2lBro=";
 
   subPackages = [ "cmd/cli" ];
 
