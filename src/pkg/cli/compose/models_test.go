@@ -186,3 +186,25 @@ func TestApplicationModelName(t *testing.T) {
 		assert.Equal(t, want, applicationModelName(model), model)
 	}
 }
+
+func TestHasModels(t *testing.T) {
+	tests := []struct {
+		name    string
+		project composeTypes.Project
+		want    bool
+	}{
+		{name: "no models", project: composeTypes.Project{Services: composeTypes.Services{"app": {Name: "app", Image: "app"}}}},
+		{name: "top-level models", want: true, project: composeTypes.Project{Models: map[string]composeTypes.ModelConfig{"llm": {Model: "ai/chat-default"}}}},
+		{name: "deprecated provider service", want: true, project: composeTypes.Project{Services: composeTypes.Services{
+			"llm": {Name: "llm", Provider: &composeTypes.ServiceProviderConfig{Type: "model", Options: composeTypes.MultiOptions{"model": {"chat-default"}}}},
+		}}},
+		{name: "provider service with its own image", project: composeTypes.Project{Services: composeTypes.Services{
+			"llm": {Name: "llm", Image: "my/gateway", Provider: &composeTypes.ServiceProviderConfig{Type: "model"}},
+		}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, HasModels(&tt.project))
+		})
+	}
+}

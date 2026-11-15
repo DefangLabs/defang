@@ -28,9 +28,8 @@ type StackConfig struct {
 
 type DefaultToolCLI struct{}
 
-func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error {
-	// TODO: how to handle Pulumi/CD image upgrades in this context?
-	return client.CanIUseProvider(ctx, fabric, provider, projectName, serviceCount, false)
+func (DefaultToolCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {
+	return client.CanIUseProvider(ctx, fabric, provider, projectName, serviceCount, allowUpgrade)
 }
 
 func (DefaultToolCLI) ConfigSet(ctx context.Context, projectName string, provider client.Provider, name, value string) error {

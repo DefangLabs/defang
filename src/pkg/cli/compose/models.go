@@ -45,7 +45,7 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 	case client.ProviderAWS, client.ProviderGCP, client.ProviderAzure:
 		mode = modelModeGateway
 	case client.ProviderDO:
-		if hasModels(project) {
+		if HasModels(project) {
 			return errors.New("managed models are not supported on DigitalOcean; deploy your own model gateway as a regular service instead")
 		}
 		return nil
@@ -130,7 +130,10 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 	return nil
 }
 
-func hasModels(project *composeTypes.Project) bool {
+// HasModels reports whether the project requests a managed model, in either
+// syntax. Such a project needs the current CD engine: an older engine ignores
+// the models: section and deploys a gateway that cannot route.
+func HasModels(project *composeTypes.Project) bool {
 	if len(project.Models) > 0 {
 		return true
 	}

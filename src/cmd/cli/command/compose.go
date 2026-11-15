@@ -89,8 +89,9 @@ func makeComposeUpCmd() *cobra.Command {
 				return handleInvalidComposeFileErr(ctx, loadErr)
 			}
 
-			// Check if the user has permission to use the provider
-			err = canIUseProvider(ctx, session.Provider, project.Name, len(project.Services), allowUpgrade)
+			// Check if the user has permission to use the provider. A model project
+			// always takes the current CD image (see compose.HasModels).
+			err = canIUseProvider(ctx, session.Provider, project.Name, len(project.Services), allowUpgrade || compose.HasModels(project))
 			if err != nil {
 				return err
 			}

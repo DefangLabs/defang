@@ -35,7 +35,7 @@ func (m *mockLogsCLI) LoadProjectNameWithFallback(context.Context, client.Loader
 	return "test-project", nil
 }
 
-func (m *mockLogsCLI) CanIUseProvider(context.Context, *client.GrpcClient, client.Provider, string, int) error {
+func (m *mockLogsCLI) CanIUseProvider(context.Context, *client.GrpcClient, client.Provider, string, int, bool) error {
 	m.callLog = append(m.callLog, "CanIUseProvider")
 	return nil
 }
