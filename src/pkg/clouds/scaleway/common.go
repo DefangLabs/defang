@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 )
 
 const (
@@ -63,6 +65,26 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body any) (*
 	}
 
 	return c.HTTPClient.Do(req)
+}
+
+const listPageSize = 100
+
+// listAllPages fetches every page of a list endpoint; page returns one page's items and the total count.
+func listAllPages[R, T any](ctx context.Context, c *Client, endpoint string, params url.Values, page func(R) ([]T, int)) ([]T, error) {
+	var all []T
+	for p := 1; ; p++ {
+		params.Set("page", strconv.Itoa(p))
+		params.Set("page_size", strconv.Itoa(listPageSize))
+		var resp R
+		if err := c.doRequestJSON(ctx, "GET", endpoint+"?"+params.Encode(), nil, &resp); err != nil {
+			return nil, err
+		}
+		items, total := page(resp)
+		all = append(all, items...)
+		if len(items) == 0 || len(all) >= total {
+			return all, nil
+		}
+	}
 }
 
 // doRequestJSON executes a request and decodes the JSON response into result.

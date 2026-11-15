@@ -161,13 +161,13 @@ func (c *Client) ListJobDefinitions(ctx context.Context, name string) ([]JobDefi
 	if name != "" {
 		params.Set("name", name)
 	}
-	fullURL := endpoint + "?" + params.Encode()
-
-	var resp listJobDefinitionsResponse
-	if err := c.doRequestJSON(ctx, "GET", fullURL, nil, &resp); err != nil {
+	defs, err := listAllPages(ctx, c, endpoint, params, func(resp listJobDefinitionsResponse) ([]JobDefinition, int) {
+		return resp.JobDefinitions, resp.TotalCount
+	})
+	if err != nil {
 		return nil, AnnotateScalewayError(err, "listing job definitions")
 	}
-	return resp.JobDefinitions, nil
+	return defs, nil
 }
 
 // DeleteJobDefinition deletes a job definition.

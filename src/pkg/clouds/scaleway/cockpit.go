@@ -63,12 +63,14 @@ func (c *Client) ListCockpitTokens(ctx context.Context, projectID string) ([]Coc
 	if projectID == "" {
 		projectID = c.ProjectID
 	}
-	endpoint := fmt.Sprintf("%s/cockpit/v1/regions/%s/tokens?project_id=%s", apiBaseURL, c.Region, projectID)
-	var resp listCockpitTokensResponse
-	if err := c.doRequestJSON(ctx, "GET", endpoint, nil, &resp); err != nil {
+	endpoint := fmt.Sprintf("%s/cockpit/v1/regions/%s/tokens", apiBaseURL, c.Region)
+	tokens, err := listAllPages(ctx, c, endpoint, url.Values{"project_id": {projectID}}, func(resp listCockpitTokensResponse) ([]CockpitToken, int) {
+		return resp.Tokens, resp.TotalCount
+	})
+	if err != nil {
 		return nil, AnnotateScalewayError(err, "listing Cockpit tokens")
 	}
-	return resp.Tokens, nil
+	return tokens, nil
 }
 
 // DeleteCockpitToken deletes a Cockpit token by ID.
