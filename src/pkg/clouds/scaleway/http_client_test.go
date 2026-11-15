@@ -383,3 +383,64 @@ func mustParseInt64(t *testing.T, value string) int64 {
 	require.NoError(t, err)
 	return parsed
 }
+
+func TestListAllPages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		path string
+		page func(page string) string
+		list func(*Client) ([]string, error)
+	}{
+		{
+			name: "job definitions",
+			path: "/serverless-jobs/v1alpha2/regions/fr-par/job-definitions",
+			page: func(page string) string {
+				return fmt.Sprintf(`{"job_definitions":[{"id":"def-%s","name":"defang-cd-%s"}],"total_count":2}`, page, page)
+			},
+			list: func(c *Client) ([]string, error) {
+				defs, err := c.ListJobDefinitions(context.Background(), "")
+				var ids []string
+				for _, def := range defs {
+					ids = append(ids, def.ID)
+				}
+				return ids, err
+			},
+		},
+		{
+			name: "cockpit tokens",
+			path: "/cockpit/v1/regions/fr-par/tokens",
+			page: func(page string) string {
+				return fmt.Sprintf(`{"tokens":[{"id":"def-%s","name":"defang-cd-%s-logs"}],"total_count":2}`, page, page)
+			},
+			list: func(c *Client) ([]string, error) {
+				tokens, err := c.ListCockpitTokens(context.Background(), "")
+				var ids []string
+				for _, token := range tokens {
+					ids = append(ids, token.ID)
+				}
+				return ids, err
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var pages []string
+			client := testClient(func(req *http.Request) (*http.Response, error) {
+				require.Equal(t, tt.path, req.URL.Path)
+				assert.Equal(t, "project-id", req.URL.Query().Get("project_id"))
+				assert.Equal(t, "100", req.URL.Query().Get("page_size"))
+				page := req.URL.Query().Get("page")
+				pages = append(pages, page)
+				return jsonResponse(http.StatusOK, tt.page(page)), nil
+			})
+
+			ids, err := tt.list(client)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"def-1", "def-2"}, ids)
+			assert.Equal(t, []string{"1", "2"}, pages)
+		})
+	}
+}
