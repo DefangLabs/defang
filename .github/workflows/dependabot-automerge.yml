@@ -1,36 +1,241 @@
 name: Dependabot auto-merge
 
-on: pull_request
+on:
+  workflow_run:
+    workflows: ['*', '!Dependabot auto-merge']
+    types: [completed]
+  check_run:
+    types: [completed]
+  status:
+  # Retry external checks that finish last; GitHub may suppress their check_run trigger.
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: Existing Dependabot pull request to check
+        required: true
+        type: string
+      dry-run:
+        description: Check eligibility without approving or merging
+        type: boolean
+        default: true
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
+
+concurrency:
+  group: dependabot-automerge-${{ github.event.workflow_run.head_sha || github.event.check_run.head_sha || github.event.sha || inputs.pull-request || github.event_name }}
+  cancel-in-progress: false
 
 jobs:
   automerge:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.head_branch != github.event.repository.default_branch
     runs-on: ubuntu-latest
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      checks: read
+      statuses: read
+      contents: read
+      pull-requests: read
     steps:
-      - name: Fetch dependabot metadata
-        id: metadata
-        uses: dependabot/fetch-metadata@0960109a4dd6d503321a0abfa87b9768962ddd12 # v3
+      # Trusted default-branch code only; never check out or execute the PR.
+      # A separate maintenance credential preserves push-triggered CI/deployment.
+      - name: Merge Dependabot updates after all checks pass
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          MERGE_CREDENTIAL_AVAILABLE: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN != '' }}
         with:
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN || github.token }}
+          script: |
+            const repo = context.repo;
+            const safeConclusions = new Set(["success", "neutral", "skipped"]);
+            const validSha = (value) => /^[0-9a-f]{40}$/.test(value);
+            const dryRun =
+              context.eventName === "workflow_dispatch" &&
+              context.payload.inputs["dry-run"] !== "false";
+            let eventSha;
+            let candidates;
+            if (context.eventName === "workflow_dispatch") {
+              const input = context.payload.inputs["pull-request"];
+              if (!/^[1-9][0-9]*$/.test(input))
+                throw new Error("A pull request number is required.");
+              const { data: pr } = await github.rest.pulls.get({
+                ...repo,
+                pull_number: Number(input),
+              });
+              candidates = [pr];
+            } else if (context.eventName === "schedule") {
+              candidates = await github.paginate(github.rest.pulls.list, {
+                ...repo,
+                state: "open",
+                per_page: 100,
+              });
+            } else {
+              eventSha =
+                context.payload.workflow_run?.head_sha ||
+                context.payload.check_run?.head_sha ||
+                context.payload.sha;
+              if (!validSha(eventSha)) throw new Error("A full commit SHA is required.");
+              candidates = await github.paginate(
+                github.rest.repos.listPullRequestsAssociatedWithCommit,
+                {
+                  ...repo,
+                  commit_sha: eventSha,
+                  per_page: 100,
+                }
+              );
+            }
+            const failures = [];
+            for (const candidate of candidates) {
+              try {
+                if (candidate.user?.login !== "dependabot[bot]") continue;
+                const pull_number = candidate.number;
+                const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number });
+                const sha = eventSha || pr.head.sha;
+                if (!validSha(sha)) throw new Error("A full commit SHA is required.");
+                const eligible = (value) =>
+                  value.state === "open" &&
+                  !value.draft &&
+                  value.user.login === "dependabot[bot]" &&
+                  value.head.sha === sha &&
+                  value.head.repo?.full_name === `${repo.owner}/${repo.repo}`;
+                if (!eligible(pr)) continue;
+                const runs = await github.paginate(
+                  github.rest.actions.listWorkflowRunsForRepo,
+                  {
+                    ...repo,
+                    head_sha: sha,
+                    per_page: 100,
+                  }
+                );
+                const latestRuns = new Map();
+                const ignoredSuites = new Set();
+                for (const run of runs) {
+                  if (
+                    run.path?.split("@")[0] === ".github/workflows/dependabot-automerge.yml"
+                  ) {
+                    if (run.check_suite_id) ignoredSuites.add(run.check_suite_id);
+                    continue;
+                  }
+                  const key = `${run.workflow_id}:${run.event}`;
+                  const previous = latestRuns.get(key);
+                  if (!previous || run.id > previous.id) latestRuns.set(key, run);
+                }
+                for (const run of runs) {
+                  const latest = latestRuns.get(`${run.workflow_id}:${run.event}`);
+                  if (latest && latest.id !== run.id && run.check_suite_id)
+                    ignoredSuites.add(run.check_suite_id);
+                }
+                const checks = (
+                  await github.paginate(github.rest.checks.listForRef, {
+                    ...repo,
+                    ref: sha,
+                    filter: "latest",
+                    per_page: 100,
+                  })
+                ).filter((check) => !ignoredSuites.has(check.check_suite?.id));
+                const statuses = await github.paginate(
+                  github.rest.repos.listCommitStatusesForRef,
+                  {
+                    ...repo,
+                    ref: sha,
+                    per_page: 100,
+                  }
+                );
+                const latestStatuses = new Map();
+                for (const status of statuses) {
+                  const previous = latestStatuses.get(status.context);
+                  if (!previous || status.id > previous.id)
+                    latestStatuses.set(status.context, status);
+                }
+                const green =
+                  [...latestRuns.values()].every(
+                    (run) =>
+                      run.status === "completed" && safeConclusions.has(run.conclusion)
+                  ) &&
+                  checks.every(
+                    (check) =>
+                      check.status === "completed" && safeConclusions.has(check.conclusion)
+                  ) &&
+                  [...latestStatuses.values()].every(
+                    (status) => status.state === "success"
+                  );
+                const hasSuccess =
+                  checks.some((check) => check.conclusion === "success") ||
+                  [...latestStatuses.values()].some((status) => status.state === "success");
+                if (!green || !hasSuccess) {
+                  core.info(
+                    `PR #${pull_number}: checks are absent, pending, or unsuccessful; leaving it open.`
+                  );
+                  continue;
+                }
+                const { data: fresh } = await github.rest.pulls.get({
+                  ...repo,
+                  pull_number,
+                });
+                if (!eligible(fresh)) continue;
+                if (dryRun) {
+                  core.info(
+                    `Would merge Dependabot PR #${pull_number} at ${sha}; all checks passed.`
+                  );
+                  continue;
+                }
+                if (process.env.MERGE_CREDENTIAL_AVAILABLE !== "true") {
+                  throw new Error(
+                    "Set DEPENDABOT_AUTOMERGE_TOKEN to a maintenance App/PAT credential so post-merge workflows still run."
+                  );
+                }
+                const approvalBody =
+                  "Approved automatically after CI passed for this Dependabot update.";
+                const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                  ...repo,
+                  pull_number,
+                  per_page: 100,
+                });
+                const latestReviews = new Map();
+                for (const review of reviews) {
+                  const login = review.user?.login;
+                  if (!login) continue;
+                  const previous = latestReviews.get(login);
+                  if (!previous || review.id > previous.id)
+                    latestReviews.set(login, review);
+                }
+                if (
+                  ![...latestReviews.values()].some(
+                    (review) =>
+                      review.commit_id === sha &&
+                      review.state === "APPROVED" &&
+                      review.body === approvalBody
+                  )
+                ) {
+                  await github.rest.pulls.createReview({
+                    ...repo,
+                    pull_number,
+                    commit_id: sha,
+                    event: "APPROVE",
+                    body: approvalBody,
+                  });
+                }
+                const { data: result } = await github.rest.pulls.merge({
+                  ...repo,
+                  pull_number,
+                  sha,
+                  merge_method: "squash",
+                });
+                if (!result.merged)
+                  throw new Error(`PR #${pull_number}: ${result.message}`);
+                core.info(
+                  `Merged Dependabot PR #${pull_number} at ${sha} after all checks passed.`
+                );
+              } catch (error) {
+                if (context.eventName !== "schedule") throw error;
+                const message = `PR #${candidate.number}: ${error.message}`;
+                core.error(message);
+                failures.push(message);
+              }
+            }
 
-      - name: Approve patch and minor updates
-        if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
-        run: gh pr review --approve "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Enable auto-merge for patch and minor updates
-        if: |
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
-        run: gh pr merge --auto --squash "$PR_URL"
-        env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            if (failures.length) throw new Error(failures.join("\n"));

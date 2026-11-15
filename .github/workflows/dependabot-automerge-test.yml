@@ -1,0 +1,19 @@
+name: Dependabot auto-merge tests
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/dependabot-automerge.yml
+      - .github/workflows/dependabot-automerge-test.yml
+      - .github/scripts/dependabot-automerge.test.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  policy-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: node --test .github/scripts/dependabot-automerge.test.mjs
