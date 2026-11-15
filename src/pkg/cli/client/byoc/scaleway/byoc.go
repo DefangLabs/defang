@@ -72,6 +72,10 @@ func (*ByocScaleway) Driver() string {
 	return "scaleway-jobs"
 }
 
+// errNotAuthenticated is returned by the methods that need the Scaleway client
+// before Authenticate has set it.
+var errNotAuthenticated = errors.New("not authenticated; call Authenticate first")
+
 func (b *ByocScaleway) Authenticate(ctx context.Context, interactive bool) error {
 	scwClient, err := scaleway.NewClientFromEnv()
 	if err != nil {
@@ -92,7 +96,7 @@ func (b *ByocScaleway) Authenticate(ctx context.Context, interactive bool) error
 
 func (b *ByocScaleway) AccountInfo(ctx context.Context) (*client.AccountInfo, error) {
 	if b.client == nil {
-		return nil, errors.New("not authenticated; call Authenticate first")
+		return nil, errNotAuthenticated
 	}
 	info := b.client.GetAccountInfo()
 	return &client.AccountInfo{
@@ -509,6 +513,10 @@ func (b *ByocScaleway) PutConfig(ctx context.Context, req *defangv1.PutConfigReq
 
 // ListConfig lists secrets from Scaleway Secret Manager.
 func (b *ByocScaleway) ListConfig(ctx context.Context, req *defangv1.ListConfigsRequest) (*defangv1.Secrets, error) {
+	// compose config does not authenticate: it lists configs on a best-effort basis.
+	if b.client == nil {
+		return nil, errNotAuthenticated
+	}
 	// getSecretName with empty name gives us the prefix (e.g., "Defang_project_stack_")
 	prefix := b.getSecretName(req.Project, "")
 	term.Debugf("Listing configs with prefix %q", prefix)
@@ -757,7 +765,7 @@ func (b *ByocScaleway) CdCommand(ctx context.Context, req client.CdCommandReques
 // CdList lists Pulumi stacks from the S3 state bucket.
 func (b *ByocScaleway) CdList(ctx context.Context, _ bool) (iter.Seq[state.Info], error) {
 	if b.s3Client == nil {
-		return nil, errors.New("not authenticated; call Authenticate first")
+		return nil, errNotAuthenticated
 	}
 	bucket := b.bucketName()
 	prefix := ".pulumi/stacks/"
