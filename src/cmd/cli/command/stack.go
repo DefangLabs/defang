@@ -190,6 +190,9 @@ func makeStackDefaultCmd() *cobra.Command {
 	return stackDefaultCmd
 }
 
+// newStackProvider is replaced in tests to observe the environment the provider is created with
+var newStackProvider = cli.NewProvider
+
 func makeStackRemoveCmd() *cobra.Command {
 	var force bool
 	var stackRemoveCmd = &cobra.Command{
@@ -219,7 +222,7 @@ func makeStackRemoveCmd() *cobra.Command {
 			if err := stacks.LoadStackEnv(*stack, true); err != nil {
 				return fmt.Errorf("failed to load stack env: %w", err)
 			}
-			provider := cli.NewProvider(ctx, stack.Provider, global.Client, stack.Name)
+			provider := newStackProvider(ctx, stack.Provider, global.Client, stack.Name)
 			if !force {
 				// RemoveStack lists deployments through the provider, which needs credentials
 				if err := authenticateProvider(ctx, provider); err != nil {

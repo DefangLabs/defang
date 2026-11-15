@@ -458,9 +458,11 @@ func TestStackExists(t *testing.T) {
 func TestStackRemoveCmdUsesStackRegion(t *testing.T) {
 	origClient := global.Client
 	origNI := global.NonInteractive
+	origNewProvider := newStackProvider
 	t.Cleanup(func() {
 		global.Client = origClient
 		global.NonInteractive = origNI
+		newStackProvider = origNewProvider
 	})
 	global.NonInteractive = true
 	global.Client = client.MockFabricClient{}
@@ -475,20 +477,22 @@ func TestStackRemoveCmdUsesStackRegion(t *testing.T) {
 	}
 	_, err := stacks.CreateInDirectory(".", params)
 	assert.NoError(t, err)
+	// t.Setenv restores each variable's prior value, including unset, after LoadStackEnv overwrites it
 	for key := range params.ToMap() {
-		os.Unsetenv(key)
+		t.Setenv(key, os.Getenv(key))
 	}
-	t.Cleanup(func() {
-		for key := range params.ToMap() {
-			os.Unsetenv(key)
-		}
-	})
 	t.Setenv("SCW_DEFAULT_REGION", "fr-par")
+
+	var providerRegion string
+	newStackProvider = func(ctx context.Context, providerID client.ProviderID, fabricClient client.FabricClient, stack string) client.Provider {
+		providerRegion = os.Getenv("SCW_DEFAULT_REGION")
+		return origNewProvider(ctx, providerID, fabricClient, stack)
+	}
 
 	stackRemoveCmd := makeStackRemoveCmd()
 	stackRemoveCmd.SetContext(t.Context())
 	stackRemoveCmd.Flags().Set("force", "true")
 
 	assert.NoError(t, stackRemoveCmd.RunE(stackRemoveCmd, []string{"amsstack"}))
-	assert.Equal(t, "nl-ams", os.Getenv("SCW_DEFAULT_REGION"))
+	assert.Equal(t, "nl-ams", providerRegion)
 }
