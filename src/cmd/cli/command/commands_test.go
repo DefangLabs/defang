@@ -546,3 +546,40 @@ func TestErrIfStackAndProvider(t *testing.T) {
 		})
 	}
 }
+
+func TestFabricUnreachable(t *testing.T) {
+	t.Chdir("../../../../src/testdata/sanity")
+	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")
+
+	// A closed server refuses connections, like being offline
+	server := httptest.NewServer(http.NotFoundHandler())
+	server.Close()
+
+	tests := []struct {
+		name    string
+		command []string
+		wantErr bool
+	}{
+		{
+			name:    "compose config works offline",
+			command: []string{"compose", "config", "--provider=defang", "--non-interactive"},
+		},
+		{
+			name:    "whoami needs Fabric",
+			command: []string{"whoami", "--non-interactive"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := testCommand(t, tt.command, server.URL)
+			if tt.wantErr {
+				if connect.CodeOf(err) != connect.CodeUnavailable {
+					t.Errorf("expected unavailable error, got %v", err)
+				}
+			} else if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
