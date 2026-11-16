@@ -342,6 +342,15 @@ func TestCdListRequiresAuth(t *testing.T) {
 	require.EqualError(t, err, "not authenticated; call Authenticate first")
 }
 
+func TestListConfigRequiresAuth(t *testing.T) {
+	t.Parallel()
+
+	provider := newTestProvider("prod")
+	provider.client = nil
+	_, err := provider.ListConfig(context.Background(), &defangv1.ListConfigsRequest{Project: "app"})
+	require.ErrorIs(t, err, errNotAuthenticated)
+}
+
 func TestAccountInfoRequiresAuthAndUsesClientContext(t *testing.T) {
 	t.Parallel()
 

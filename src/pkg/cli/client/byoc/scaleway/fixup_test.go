@@ -109,3 +109,18 @@ func TestScalewayFixupPreservesOverridesAndRequiresOnlyManagedRedisConfig(t *tes
 	assert.Equal(t, endpoint, *project.Services["app"].Environment["LLM_URL"])
 	assert.Equal(t, key, *project.Services["app"].Environment["OPENAI_API_KEY"])
 }
+
+// compose config runs the fixups without authenticating the provider; it must
+// still print the project instead of panicking on the missing client.
+func TestComposeConfigFixupsWithoutAuth(t *testing.T) {
+	t.Parallel()
+
+	provider := newTestProvider("prod")
+	provider.client = nil
+	project := &composeTypes.Project{
+		Name:     "app",
+		Networks: composeTypes.Networks{},
+		Services: composeTypes.Services{"web": {Name: "web", Image: "nginx", Environment: composeTypes.MappingWithEquals{}}},
+	}
+	require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
+}
