@@ -21,6 +21,12 @@ func (p accountProvider) AccountInfo(context.Context) (*client.AccountInfo, erro
 	return &p.info, nil
 }
 
+type legacyCDProvider struct {
+	accountProvider
+}
+
+func (legacyCDProvider) LegacyCD() bool { return true }
+
 type directProvider struct {
 	client.MockProvider
 }
@@ -105,6 +111,82 @@ func TestFixupModelRequestPayloads(t *testing.T) {
 			assert.Equal(t, "chat-default", *worker.Environment["WORKER_CHAT_MODEL"])
 			assert.Equal(t, "us.amazon.nova-2-lite-v1:0", *worker.Environment["EXACT_MODEL"])
 			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"], "explicit model stays authoritative")
+		})
+	}
+}
+
+// A defang-mvp CD engine deploys the gateway command as written, so the payload
+// is the one the CLI sent before recipes, with the ai/ spellings normalized.
+func TestFixupLegacyCDModelRequests(t *testing.T) {
+	tests := []struct {
+		info     client.AccountInfo
+		commands map[string][]string
+		env      map[string]string // on every gateway
+		models   map[string]string // consumer variable -> routed model
+	}{
+		{
+			info: client.AccountInfo{Provider: client.ProviderAWS, Region: "us-west-2", AccountID: "123456789012"},
+			commands: map[string][]string{
+				"chat":  {"--drop_params", "--model", "bedrock/us.amazon.nova-2-lite-v1:0", "--alias", "chat-default"},
+				"embed": {"--drop_params", "--model", "bedrock/amazon.titan-embed-text-v2:0", "--alias", "embedding-default"},
+				"exact": {"--drop_params", "--model", "bedrock/us.amazon.nova-2-lite-v1:0", "--alias", "us.amazon.nova-2-lite-v1:0"},
+				"large": {"--drop_params", "--model", "bedrock/zai.glm-5", "--alias", "chat-large"},
+			},
+			env: map[string]string{"AWS_REGION": "us-west-2"},
+			models: map[string]string{
+				"CHAT_MODEL":        "bedrock/us.amazon.nova-2-lite-v1:0",
+				"EMBED_MODEL_NAME":  "bedrock/amazon.titan-embed-text-v2:0",
+				"WORKER_CHAT_MODEL": "bedrock/us.amazon.nova-2-lite-v1:0",
+				"EXACT_MODEL":       "bedrock/us.amazon.nova-2-lite-v1:0",
+			},
+		},
+		{
+			info: client.AccountInfo{Provider: client.ProviderGCP, Region: "us-central1", AccountID: "my-project"},
+			commands: map[string][]string{
+				"chat":  {"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"},
+				"embed": {"--drop_params", "--model", "vertex_ai/gemini-embedding-001", "--alias", "embedding-default"},
+				"exact": {"--drop_params", "--model", "vertex_ai/us.amazon.nova-2-lite-v1:0", "--alias", "us.amazon.nova-2-lite-v1:0"},
+				"large": {"--drop_params", "--model", "vertex_ai/gemini-3.1-pro-preview", "--alias", "chat-large"},
+			},
+			env: map[string]string{"VERTEXAI_PROJECT": "my-project"},
+			models: map[string]string{
+				"CHAT_MODEL":        "vertex_ai/gemini-3.5-flash",
+				"EMBED_MODEL_NAME":  "vertex_ai/gemini-embedding-001",
+				"WORKER_CHAT_MODEL": "vertex_ai/gemini-3.5-flash",
+				"EXACT_MODEL":       "vertex_ai/us.amazon.nova-2-lite-v1:0",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.info.Provider.String(), func(t *testing.T) {
+			project := loadModelRequests(t)
+			require.NoError(t, FixupServices(t.Context(), legacyCDProvider{accountProvider{info: tt.info}}, project, UploadModeIgnore))
+			payload, err := MarshalYAML(project)
+			require.NoError(t, err)
+			require.NoError(t, pkg.Compare(payload, modelRequestsCompose+"."+strings.ToLower(tt.info.Provider.String())+"-legacy.golden"))
+
+			for name, want := range tt.commands {
+				gateway := project.Services[name]
+				assert.Equal(t, want, []string(gateway.Command), name)
+				for key, val := range tt.env {
+					assert.Equal(t, val, *gateway.Environment[key], "%s: %s", name, key)
+				}
+			}
+			if tt.info.Provider == client.ProviderGCP {
+				// The built-in chat models are served from the global Vertex location only.
+				assert.Equal(t, "global", *project.Services["chat"].Environment["VERTEXAI_LOCATION"])
+				assert.Equal(t, "us-central1", *project.Services["embed"].Environment["VERTEXAI_LOCATION"])
+			}
+			app, worker := project.Services["app"], project.Services["worker"]
+			for _, consumer := range []composeTypes.ServiceConfig{app, worker} {
+				for key, want := range tt.models {
+					if got, ok := consumer.Environment[key]; ok {
+						assert.Equal(t, want, *got, "%s: %s", consumer.Name, key)
+					}
+				}
+			}
+			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"], "explicit model stays authoritative")
+			assert.Nil(t, app.Models["chat"], "the binding is left as written")
 		})
 	}
 }

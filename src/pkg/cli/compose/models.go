@@ -18,13 +18,22 @@ type DirectModelProvider interface {
 	DirectModelEndpoint() string
 }
 
+// LegacyCDProvider is implemented by providers that know whether the CD image
+// they will run was built by defang-mvp, which still serves AWS and GCP. That
+// engine ignores the models: section and deploys the gateway command as
+// written, so the CLI routes the gateway itself, as it did before recipes.
+type LegacyCDProvider interface {
+	LegacyCD() bool
+}
+
 var errNoModel = errors.New("no model specified")
 
 type modelMode int
 
 const (
-	// modelModeLiteral routes the gateway to the model name as written; the
-	// Playground has no BYOC CD engine that could resolve it.
+	// modelModeLiteral routes the gateway from the CLI: to the model name as
+	// written in the Playground, which has no BYOC CD engine that could resolve
+	// it, and through the pre-recipe mapping for a defang-mvp CD engine.
 	modelModeLiteral modelMode = iota
 	// modelModeGateway leaves the gateway's routing to the CD engine, which
 	// resolves models.<name>.model through the deployment's recipe.
@@ -42,7 +51,12 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 	mode := modelModeLiteral
 	var directEndpoint string
 	switch info.Provider {
-	case client.ProviderAWS, client.ProviderGCP, client.ProviderAzure:
+	case client.ProviderAWS, client.ProviderGCP:
+		mode = modelModeGateway
+		if legacy, ok := provider.(LegacyCDProvider); ok && legacy.LegacyCD() {
+			mode = modelModeLiteral
+		}
+	case client.ProviderAzure:
 		mode = modelModeGateway
 	case client.ProviderDO:
 		if HasModels(project) {
@@ -66,7 +80,7 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 		term.Warnf("service %q: 'provider: type: model' is deprecated; use a top-level 'models:' entry instead", name)
 		model := providerServiceModel(&svccfg)
 		if mode == modelModeLiteral {
-			project.Services[name] = makeLiteralGateway(svccfg, project, model)
+			project.Services[name] = makeLiteralGateway(svccfg, project, model, info)
 			continue
 		}
 		if model == "" {
@@ -92,7 +106,7 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 		}
 		switch mode {
 		case modelModeLiteral:
-			svccfg := makeLiteralGateway(composeTypes.ServiceConfig{Name: name, Extensions: maps.Clone(model.Extensions)}, project, model.Model)
+			svccfg := makeLiteralGateway(composeTypes.ServiceConfig{Name: name, Extensions: maps.Clone(model.Extensions)}, project, model.Model, info)
 			if _, ok := svccfg.Extensions["x-defang-llm"]; !ok {
 				svccfg.Extensions["x-defang-llm"] = true
 			}
@@ -131,8 +145,9 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 }
 
 // HasModels reports whether the project requests a managed model, in either
-// syntax. Such a project needs the current CD engine: an older engine ignores
-// the models: section and deploys a gateway that cannot route.
+// syntax. Such a project needs the current CD engine: a Go CD engine from
+// before recipes ignores the models: section and deploys a gateway that cannot
+// route. A defang-mvp engine gets a gateway the CLI routes (see LegacyCDProvider).
 func HasModels(project *composeTypes.Project) bool {
 	if len(project.Models) > 0 {
 		return true
@@ -176,18 +191,75 @@ func warnUnsupportedModelOptions(model composeTypes.ModelConfig) {
 	}
 }
 
-func makeLiteralGateway(svccfg composeTypes.ServiceConfig, project *composeTypes.Project, model string) composeTypes.ServiceConfig {
+func makeLiteralGateway(svccfg composeTypes.ServiceConfig, project *composeTypes.Project, model string, info *client.AccountInfo) composeTypes.ServiceConfig {
 	if svccfg.Extensions == nil {
 		svccfg.Extensions = make(composeTypes.Extensions)
 	}
 	masterKey := configureAccessGateway(&svccfg, project)
-	svccfg.Command = []string{"--drop_params", "--model", model, "--alias", model}
+	alias, route := model, model
+	if info.Provider == client.ProviderAWS || info.Provider == client.ProviderGCP {
+		alias = applicationModelName(model)
+		route = legacyGatewayRoute(&svccfg, alias, info)
+	}
+	svccfg.Command = []string{"--drop_params", "--model", route, "--alias", alias}
 	var modelVal *string
-	if model != "" {
-		modelVal = &model
+	if route != "" {
+		modelVal = &route
 	}
 	wireModelConsumers(project, svccfg.Name, modelWiring{endpoint: gatewayURL(svccfg.Name), model: modelVal, apiKey: masterKey})
 	return svccfg
+}
+
+// legacyGatewayRoute returns the LiteLLM route for model on a defang-mvp CD
+// engine and sets the gateway's provider environment. This is the mapping the
+// CLI applied before the CD engine resolved models through recipes; keep it
+// unchanged until no Fabric serves a defang-mvp CD engine.
+func legacyGatewayRoute(svccfg *composeTypes.ServiceConfig, model string, info *client.AccountInfo) string {
+	if model == "" {
+		return ""
+	}
+	switch info.Provider {
+	case client.ProviderAWS:
+		switch model {
+		case "chat-default":
+			model = "us.amazon.nova-2-lite-v1:0"
+		case "chat-large":
+			model = "zai.glm-5"
+		case "embedding-default":
+			model = "amazon.titan-embed-text-v2:0"
+		}
+		if info.Region != "" {
+			svccfg.Environment["AWS_REGION"] = &info.Region
+		}
+		return modelWithProvider(model, "bedrock")
+	case client.ProviderGCP:
+		location := info.Region
+		switch model {
+		case "chat-default":
+			model = "gemini-3.5-flash"
+			location = "global"
+		case "chat-large":
+			model = "gemini-3.1-pro-preview"
+			location = "global"
+		case "embedding-default":
+			model = "gemini-embedding-001"
+		}
+		if info.AccountID != "" {
+			svccfg.Environment["VERTEXAI_PROJECT"] = &info.AccountID
+		}
+		if location != "" {
+			svccfg.Environment["VERTEXAI_LOCATION"] = &location
+		}
+		return modelWithProvider(model, "vertex_ai")
+	}
+	return model
+}
+
+func modelWithProvider(model, prefix string) string {
+	if strings.Contains(model, "/") {
+		return model // already has a provider prefix
+	}
+	return prefix + "/" + model
 }
 
 type modelWiring struct {
