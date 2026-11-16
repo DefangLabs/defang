@@ -241,6 +241,24 @@ func TestFixupModelRequestErrors(t *testing.T) {
 			wantErr:  `service "llm": no model specified`,
 		},
 		{
+			name:     "model shadows a service",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderAWS}},
+			compose:  "  chat:\n    image: chat\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
+			name:     "model shadows a service on a direct provider",
+			provider: directProvider{},
+			compose:  "  chat:\n    image: chat\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
+			name:     "model shadows a deprecated model service in the Playground",
+			provider: accountProvider{},
+			compose:  "  chat:\n    provider:\n      type: model\n      options:\n        model: chat-default\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
 			name:     "top-level model without a model",
 			provider: directProvider{},
 			compose:  "models:\n  llm:\n    model: \"\"\n",

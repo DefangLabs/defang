@@ -98,6 +98,11 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 	}
 
 	for _, name := range slices.Sorted(maps.Keys(project.Models)) {
+		// A model is deployed as (or wired like) a service of the same name, so
+		// it must not shadow one. Converted deprecated services were removed above.
+		if _, exists := project.Services[name]; exists {
+			return fmt.Errorf("model %q: a service has the same name", name)
+		}
 		model := project.Models[name]
 		model.Name = name
 		warnUnsupportedModelOptions(model)
