@@ -431,10 +431,18 @@ var RootCmd = &cobra.Command{
 		}
 		global.Client, err = cli.ConnectWithTenant(ctx, global.FabricAddr, requestedTenant)
 		if err != nil {
-			if connect.CodeOf(err) != connect.CodeUnauthenticated {
+			switch connect.CodeOf(err) {
+			case connect.CodeUnauthenticated:
+				term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
+			case connect.CodeUnavailable:
+				if _, ok := cmd.Annotations[authNeeded]; ok {
+					return err
+				}
+				// Commands like compose config must also work offline; they treat Fabric calls as best-effort.
+				term.Debug("Unable to reach Fabric; continuing without it:", err)
+			default:
 				return err
 			}
-			term.Debug("Using existing token failed; continuing to allow login/ToS flow:", err)
 		}
 
 		track.Tracker = global.Client // update tracker with the real client
