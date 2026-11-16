@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"connectrpc.com/connect"
@@ -222,7 +223,7 @@ func isTransientError(err error) bool {
 	if code == connect.CodeInternal && !connect.IsWireError(err) {
 		return true
 	}
-	if errors.Is(err, io.ErrUnexpectedEOF) {
+	if errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, syscall.ECONNRESET) {
 		return true
 	}
 

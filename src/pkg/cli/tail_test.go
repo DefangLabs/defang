@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -39,6 +41,7 @@ func TestIsTransientError(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"eof", io.EOF, false},
+		{"connection reset", connect.NewError(connect.CodeUnknown, &net.OpError{Op: "read", Net: "tcp", Err: os.NewSyscallError("read", syscall.ECONNRESET)}), true},
 		{"idle timeout", pkg.ErrIdleTimeout, true},
 		{"connect unavailable", connect.NewError(connect.CodeUnavailable, errors.New("unavailable")), true},
 		{"connect internal non-wire", connect.NewError(connect.CodeInternal, errors.New("internal")), true},
