@@ -510,7 +510,6 @@ func (b *ByocAzure) runCdCommand(ctx context.Context, cmd cdCommand) (string, er
 		Image:   b.CDImage,
 		Command: append([]string{"/app/cd"}, cmd.command...),
 		Envs:    env,
-		Timeout: 30 * time.Minute,
 	})
 }
 
