@@ -777,3 +777,34 @@ func TestFetchLogsFromWorkspaceViaTailJobLogs(t *testing.T) {
 	for range seq {
 	}
 }
+
+func TestCdJobIsCurrent(t *testing.T) {
+	job := func(principal *string, timeout *int32) armappcontainersv3.Job {
+		j := armappcontainersv3.Job{Properties: &armappcontainersv3.JobProperties{
+			Configuration: &armappcontainersv3.JobConfiguration{ReplicaTimeout: timeout},
+		}}
+		if principal != nil {
+			j.Identity = &armappcontainersv3.ManagedServiceIdentity{PrincipalID: principal}
+		}
+		return j
+	}
+	tests := []struct {
+		name string
+		job  armappcontainersv3.Job
+		want bool
+	}{
+		{"current", job(to.Ptr("p"), to.Ptr(cdJobReplicaTimeout)), true},
+		{"old 30 minute timeout", job(to.Ptr("p"), to.Ptr(int32(1800))), false},
+		{"no timeout", job(to.Ptr("p"), nil), false},
+		{"no configuration", armappcontainersv3.Job{Identity: &armappcontainersv3.ManagedServiceIdentity{PrincipalID: to.Ptr("p")}}, false},
+		{"no identity", job(nil, to.Ptr(cdJobReplicaTimeout)), false},
+		{"empty principal", job(to.Ptr(""), to.Ptr(cdJobReplicaTimeout)), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := cdJobIsCurrent(tt.job); got != tt.want {
+				t.Errorf("cdJobIsCurrent() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

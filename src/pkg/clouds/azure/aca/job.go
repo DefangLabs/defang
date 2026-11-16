@@ -43,6 +43,11 @@ const (
 	// too small for Pulumi previews and noticeably slowed CD runs.
 	cdJobCPU    = 2.0
 	cdJobMemory = "4Gi"
+
+	// cdJobReplicaTimeout matches the cd program's own ceiling (CdTimeout in
+	// pulumi-defang), so ACA does not kill a run the program would finish.
+	// Deleting a Container Apps environment alone can take over 25 minutes.
+	cdJobReplicaTimeout = int32(time.Hour / time.Second)
 )
 
 // logAnalyticsEndpoint is the base URL for the Log Analytics query API, overridable for tests.
@@ -56,8 +61,6 @@ type JobRequest struct {
 	Envs map[string]string
 	// SecretEnvs are environment variables that should be stored as secrets (not shown in plain text).
 	SecretEnvs map[string]string
-	// Timeout is the maximum execution duration.
-	Timeout time.Duration
 }
 
 // JobStatus represents the status of a Container Apps Job execution.
@@ -357,9 +360,9 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 	// the job already exists with a populated system-assigned principal.
 	// Image and env vars on the template are placeholders — StartJobExecution
 	// overrides them per-run — so we don't need to compare them here.
+	// A job created by an older CLI has a shorter replica timeout; upsert it.
 	if envMap == nil {
-		if resp, err := jobsClient.Get(ctx, j.ResourceGroup, cdJobName, nil); err == nil &&
-			resp.Identity != nil && resp.Identity.PrincipalID != nil && *resp.Identity.PrincipalID != "" {
+		if resp, err := jobsClient.Get(ctx, j.ResourceGroup, cdJobName, nil); err == nil && cdJobIsCurrent(resp.Job) {
 			j.SystemPrincipalID = *resp.Identity.PrincipalID
 			term.Debugf("SetUpJob: %q already exists; skipping upsert", cdJobName)
 			return nil
@@ -376,7 +379,6 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 		})
 	}
 
-	timeout := int32((30 * time.Minute).Seconds())
 	const tmpVolumeName = "tmp"
 	poller, err := jobsClient.BeginCreateOrUpdate(ctx, j.ResourceGroup, cdJobName, armappcontainersv3.Job{
 		Location: j.Location.Ptr(),
@@ -387,7 +389,7 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 			EnvironmentID: to.Ptr(j.EnvironmentID),
 			Configuration: &armappcontainersv3.JobConfiguration{
 				TriggerType:       to.Ptr(armappcontainersv3.TriggerTypeManual),
-				ReplicaTimeout:    to.Ptr(timeout),
+				ReplicaTimeout:    to.Ptr(cdJobReplicaTimeout),
 				ReplicaRetryLimit: to.Ptr(int32(0)),
 			},
 			Template: &armappcontainersv3.JobTemplate{
@@ -432,6 +434,18 @@ func (j *Job) SetUpJob(ctx context.Context, image string, envMap map[string]stri
 	return nil
 }
 
+// cdJobIsCurrent reports whether an existing CD job can be used as is: it has
+// a system-assigned principal and the current replica timeout.
+func cdJobIsCurrent(job armappcontainersv3.Job) bool {
+	if job.Identity == nil || job.Identity.PrincipalID == nil || *job.Identity.PrincipalID == "" {
+		return false
+	}
+	if job.Properties == nil || job.Properties.Configuration == nil || job.Properties.Configuration.ReplicaTimeout == nil {
+		return false
+	}
+	return *job.Properties.Configuration.ReplicaTimeout == cdJobReplicaTimeout
+}
+
 // StartJobExecution starts a new execution of the CD job with the given image, command,
 // and environment variables. Returns the execution name.
 func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, error) {
@@ -468,7 +482,7 @@ func (j *Job) StartJobExecution(ctx context.Context, req JobRequest) (string, er
 			Properties: &armappcontainersv3.JobPatchPropertiesProperties{
 				Configuration: &armappcontainersv3.JobConfiguration{
 					TriggerType:    to.Ptr(armappcontainersv3.TriggerTypeManual),
-					ReplicaTimeout: to.Ptr(int32((30 * time.Minute).Seconds())),
+					ReplicaTimeout: to.Ptr(cdJobReplicaTimeout),
 					Secrets:        secrets,
 				},
 			},
