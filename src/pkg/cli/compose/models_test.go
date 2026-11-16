@@ -21,11 +21,11 @@ func (p accountProvider) AccountInfo(context.Context) (*client.AccountInfo, erro
 	return &p.info, nil
 }
 
-type legacyCDProvider struct {
+type defangMvpCDProvider struct {
 	accountProvider
 }
 
-func (legacyCDProvider) LegacyCD() bool { return true }
+func (defangMvpCDProvider) DefangMvpCD() bool { return true }
 
 type directProvider struct {
 	client.MockProvider
@@ -117,7 +117,7 @@ func TestFixupModelRequestPayloads(t *testing.T) {
 
 // A defang-mvp CD engine deploys the gateway command as written, so the payload
 // is the one the CLI sent before recipes, with the ai/ spellings normalized.
-func TestFixupLegacyCDModelRequests(t *testing.T) {
+func TestFixupDefangMvpCDModelRequests(t *testing.T) {
 	tests := []struct {
 		info     client.AccountInfo
 		commands map[string][]string
@@ -160,10 +160,10 @@ func TestFixupLegacyCDModelRequests(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.info.Provider.String(), func(t *testing.T) {
 			project := loadModelRequests(t)
-			require.NoError(t, FixupServices(t.Context(), legacyCDProvider{accountProvider{info: tt.info}}, project, UploadModeIgnore))
+			require.NoError(t, FixupServices(t.Context(), defangMvpCDProvider{accountProvider{info: tt.info}}, project, UploadModeIgnore))
 			payload, err := MarshalYAML(project)
 			require.NoError(t, err)
-			require.NoError(t, pkg.Compare(payload, modelRequestsCompose+"."+strings.ToLower(tt.info.Provider.String())+"-legacy.golden"))
+			require.NoError(t, pkg.Compare(payload, modelRequestsCompose+"."+strings.ToLower(tt.info.Provider.String())+"-defang-mvp.golden"))
 
 			for name, want := range tt.commands {
 				gateway := project.Services[name]

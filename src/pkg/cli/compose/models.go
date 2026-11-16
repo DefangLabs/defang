@@ -18,12 +18,12 @@ type DirectModelProvider interface {
 	DirectModelEndpoint() string
 }
 
-// LegacyCDProvider is implemented by providers that know whether the CD image
+// DefangMvpCDProvider is implemented by providers that know whether the CD image
 // they will run was built by defang-mvp, which still serves AWS and GCP. That
 // engine ignores the models: section and deploys the gateway command as
 // written, so the CLI routes the gateway itself, as it did before recipes.
-type LegacyCDProvider interface {
-	LegacyCD() bool
+type DefangMvpCDProvider interface {
+	DefangMvpCD() bool
 }
 
 var errNoModel = errors.New("no model specified")
@@ -53,7 +53,7 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 	switch info.Provider {
 	case client.ProviderAWS, client.ProviderGCP:
 		mode = modelModeGateway
-		if legacy, ok := provider.(LegacyCDProvider); ok && legacy.LegacyCD() {
+		if mvp, ok := provider.(DefangMvpCDProvider); ok && mvp.DefangMvpCD() {
 			mode = modelModeLiteral
 		}
 	case client.ProviderAzure:
@@ -150,9 +150,9 @@ func fixupModels(provider client.Provider, project *composeTypes.Project, info *
 }
 
 // HasModels reports whether the project requests a managed model, in either
-// syntax. Such a project needs the current CD engine: a Go CD engine from
-// before recipes ignores the models: section and deploys a gateway that cannot
-// route. A defang-mvp engine gets a gateway the CLI routes (see LegacyCDProvider).
+// syntax. Such a project needs the current CD engine: a pulumi-defang CD engine
+// from before recipes ignores the models: section and deploys a gateway that cannot
+// route. A defang-mvp engine gets a gateway the CLI routes (see DefangMvpCDProvider).
 func HasModels(project *composeTypes.Project) bool {
 	if len(project.Models) > 0 {
 		return true
@@ -204,7 +204,7 @@ func makeLiteralGateway(svccfg composeTypes.ServiceConfig, project *composeTypes
 	alias, route := model, model
 	if info.Provider == client.ProviderAWS || info.Provider == client.ProviderGCP {
 		alias = applicationModelName(model)
-		route = legacyGatewayRoute(&svccfg, alias, info)
+		route = defangMvpGatewayRoute(&svccfg, alias, info)
 	}
 	svccfg.Command = []string{"--drop_params", "--model", route, "--alias", alias}
 	var modelVal *string
@@ -215,11 +215,11 @@ func makeLiteralGateway(svccfg composeTypes.ServiceConfig, project *composeTypes
 	return svccfg
 }
 
-// legacyGatewayRoute returns the LiteLLM route for model on a defang-mvp CD
+// defangMvpGatewayRoute returns the LiteLLM route for model on a defang-mvp CD
 // engine and sets the gateway's provider environment. This is the mapping the
 // CLI applied before the CD engine resolved models through recipes; keep it
 // unchanged until no Fabric serves a defang-mvp CD engine.
-func legacyGatewayRoute(svccfg *composeTypes.ServiceConfig, model string, info *client.AccountInfo) string {
+func defangMvpGatewayRoute(svccfg *composeTypes.ServiceConfig, model string, info *client.AccountInfo) string {
 	if model == "" {
 		return ""
 	}

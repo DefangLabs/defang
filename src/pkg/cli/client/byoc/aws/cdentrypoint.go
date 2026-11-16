@@ -9,8 +9,8 @@ import (
 // around it.
 var goCDEntrypoint = []string{"/app/cd"}
 
-// nodeCDEntrypoint is the CD program inside the legacy TypeScript CD image
-// built by defang-mvp's cd.Dockerfile, which runs under Node.
+// nodeCDEntrypoint is the CD program inside the TypeScript AWS CD image built
+// by defang-mvp's cd.Dockerfile, which runs under Node.
 var nodeCDEntrypoint = []string{"node", "lib/index.js"}
 
 // cdEntrypoint returns the argv prefix that starts the CD program in cdImage.
@@ -21,7 +21,7 @@ var nodeCDEntrypoint = []string{"node", "lib/index.js"}
 // differently. Azure Container Apps and GCP Cloud Build launch the image's
 // ENTRYPOINT directly and never call this.
 func cdEntrypoint(cdImage string) []string {
-	if byoc.IsLegacyCDImage(cdImage) {
+	if byoc.IsDefangMvpCDImage(cdImage) {
 		return nodeCDEntrypoint
 	}
 	return goCDEntrypoint

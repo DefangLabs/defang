@@ -7,26 +7,25 @@ import (
 	"github.com/distribution/reference"
 )
 
-// IsLegacyCDImage reports whether cdImage was built by defang-mvp rather than
+// IsDefangMvpCDImage reports whether cdImage was built by defang-mvp rather than
 // DefangLabs/pulumi-defang. defang-mvp tags every CD image "<name>-<sha>-<arch>"
 // with a name that starts with "public-" or "nodejs-" (public-cd-image and
 // nodejs-cd-image for AWS, public-gcp for GCP), and its fallback tags are
-// public-beta and public-gcp-beta. The Go CD images are tagged by version
-// instead (v2.6.0-aws, 2.6.0-alpha-<sha>, pr-<number>), or left untagged:
-// every ref Fabric pins through its cd_image_* config is a bare digest, and
-// only the Go CD pipeline writes those config keys, so untagged also means Go.
+// public-beta and public-gcp-beta. pulumi-defang CD images are tagged by
+// version instead (v2.6.0-aws, 2.6.0-alpha-<sha>, pr-<number>), or pinned by a
+// bare digest, so an untagged image is never a defang-mvp image.
 //
 // The image reference is the only signal available: Fabric returns a bare URI
 // in CanIUseResponse.cd_image, and both flavours are published to the same
 // repositories, so neither the registry nor the repository path tells them apart.
-func IsLegacyCDImage(cdImage string) bool {
+func IsDefangMvpCDImage(cdImage string) bool {
 	tag := cdImageTag(cdImage)
 	return strings.HasPrefix(tag, "public-") || strings.HasPrefix(tag, "nodejs-")
 }
 
-// LegacyCD reports whether this client runs a defang-mvp CD image; see IsLegacyCDImage.
-func (b *ByocBaseClient) LegacyCD() bool {
-	return IsLegacyCDImage(b.CDImage)
+// DefangMvpCD reports whether this client runs a defang-mvp CD image; see IsDefangMvpCDImage.
+func (b *ByocBaseClient) DefangMvpCD() bool {
+	return IsDefangMvpCDImage(b.CDImage)
 }
 
 // cdImageTag returns the tag of an image reference, or "" if it has none

@@ -12,12 +12,12 @@ func TestCDEntrypoint(t *testing.T) {
 		expected []string
 	}{
 		{
-			name:     "legacy public CD image",
+			name:     "defang-mvp public CD image",
 			cdImage:  "public.ecr.aws/defang-io/cd:public-cd-image-3b4eb980-arm64@sha256:5233e7e84a8a128ba47f36db3ce0eff10ae6242adb5568c7b1e2e0474b38a677",
 			expected: nodeCDEntrypoint,
 		},
 		{
-			name:     "legacy nodejs CD image",
+			name:     "defang-mvp nodejs CD image",
 			cdImage:  "381492210770.dkr.ecr.us-west-2.amazonaws.com/defang-cd-ecr-public/defang-io/cd:nodejs-cd-image-707883e0-x86_64",
 			expected: nodeCDEntrypoint,
 		},
