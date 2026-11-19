@@ -450,6 +450,47 @@ func TestRunCdCommandUsesNonSecretEnvironmentOverrides(t *testing.T) {
 	assert.Equal(t, "run-id", runID)
 }
 
+func TestDeployForwardsScalewayTTL(t *testing.T) {
+	t.Setenv("DEFANG_PULUMI_DIR", "")
+	for _, ttl := range []string{"", "2h"} {
+		t.Run("ttl="+ttl, func(t *testing.T) {
+			provider := newTestProvider("prod")
+			provider.SetupDone = true
+			provider.CDImage = "defangio/test-cd"
+			provider.jobDefID = "job-def"
+			provider.cdAuthSecretID = "secret-reference"
+			provider.client.HTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				require.Equal(t, "/serverless-jobs/v1alpha2/regions/fr-par/job-definitions/job-def/start", req.URL.Path)
+				var run struct {
+					Args []string          `json:"args"`
+					Env  map[string]string `json:"environment_variables"`
+				}
+				require.NoError(t, json.NewDecoder(req.Body).Decode(&run))
+				if ttl == "" {
+					require.Len(t, run.Args, 2)
+					assert.Equal(t, "up", run.Args[0])
+					assert.NotContains(t, run.Env, "DEFANG_TTL")
+					assert.NotContains(t, run.Env, "DEFANG_SCW_CD_SECRET_ID")
+				} else {
+					require.Len(t, run.Args, 3)
+					assert.Equal(t, []string{"scaleway-ttl", "up"}, run.Args[:2])
+					assert.Equal(t, ttl, run.Env["DEFANG_TTL"])
+					assert.Equal(t, "defang-cd-prod", run.Env["DEFANG_SCW_CD_JOB_NAME"])
+					assert.Equal(t, "secret-reference", run.Env["DEFANG_SCW_CD_SECRET_ID"])
+				}
+				assert.NotContains(t, run.Env, "SCW_SECRET_KEY")
+				return jsonResponse(`{"job_runs":[{"id":"run-id","state":"queued"}]}`), nil
+			})}
+
+			_, err := provider.Deploy(t.Context(), &client.DeployRequest{
+				DeployRequest: defangv1.DeployRequest{Compose: []byte("name: demo\nservices:\n  web:\n    image: nginx\n")},
+				TTL:           ttl,
+			})
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestCreateCDSecretReferences(t *testing.T) {
 	t.Parallel()
 
@@ -490,6 +531,7 @@ func TestCreateCDSecretReferences(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.True(t, sawJobSecretRefs)
+	assert.Equal(t, "defang-cd-prod-SCW-SECRET-KEY", provider.cdAuthSecretID)
 }
 
 func newTestProvider(stack string) *ByocScaleway {

@@ -47,6 +47,7 @@ type ByocScaleway struct {
 	// CD infrastructure
 	bucket           string
 	jobDefID         string
+	cdAuthSecretID   string
 	registryEndpoint string
 
 	// CD run tracking
@@ -256,6 +257,7 @@ func (b *ByocScaleway) createCDSecretReferences(ctx context.Context, jobDefID st
 		return nil
 	}
 	refs := make([]scaleway.JobSecretRef, 0, len(secretEnv))
+	var authSecretID string
 	for _, key := range []string{"AWS_SECRET_ACCESS_KEY", "PULUMI_CONFIG_PASSPHRASE", "SCW_SECRET_KEY"} {
 		value, ok := secretEnv[key]
 		if !ok {
@@ -265,13 +267,20 @@ func (b *ByocScaleway) createCDSecretReferences(ctx context.Context, jobDefID st
 		if err != nil {
 			return scaleway.AnnotateScalewayError(err, fmt.Sprintf("creating CD secret %q", key))
 		}
+		if key == "SCW_SECRET_KEY" {
+			authSecretID = secret.ID
+		}
 		refs = append(refs, scaleway.JobSecretRef{
 			SecretManagerID:      secret.ID,
 			SecretManagerVersion: strconv.Itoa(version.Revision),
 			EnvVarName:           key,
 		})
 	}
-	return b.client.CreateJobSecrets(ctx, jobDefID, refs)
+	if err := b.client.CreateJobSecrets(ctx, jobDefID, refs); err != nil {
+		return err
+	}
+	b.cdAuthSecretID = authSecretID
+	return nil
 }
 
 type cdCommand struct {
@@ -282,6 +291,7 @@ type cdCommand struct {
 	project        string
 	statesUrl      string
 	eventsUrl      string
+	ttl            string
 }
 
 func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string, error) {
@@ -304,6 +314,17 @@ func (b *ByocScaleway) runCdCommand(ctx context.Context, cmd cdCommand) (string,
 	}
 	if cmd.eventsUrl != "" {
 		env["DEFANG_EVENTS_UPLOAD_URL"] = cmd.eventsUrl
+	}
+	if cmd.ttl != "" {
+		if b.cdAuthSecretID == "" {
+			return "", errors.New("Scaleway deployment TTL requires a Serverless Jobs CD run; unset DEFANG_PULUMI_DIR to use it")
+		}
+		env["DEFANG_TTL"] = cmd.ttl
+		env["DEFANG_SCW_CD_JOB_NAME"] = b.cdJobName()
+		env["DEFANG_SCW_CD_SECRET_ID"] = b.cdAuthSecretID
+		// Older CD images ignore DEFANG_TTL on Scaleway. Use an explicit
+		// command so they fail before creating a deployment without teardown.
+		cmd.command = append([]string{"scaleway-ttl"}, cmd.command...)
 	}
 
 	if os.Getenv("DEFANG_PULUMI_DIR") != "" {
@@ -395,6 +416,7 @@ func (b *ByocScaleway) deploy(ctx context.Context, req *client.DeployRequest, cm
 		project:        project.Name,
 		statesUrl:      req.StatesUrl,
 		eventsUrl:      req.EventsUrl,
+		ttl:            req.TTL,
 	}
 	runID, err := b.runCdCommand(ctx, cdCmd)
 	if err != nil {
