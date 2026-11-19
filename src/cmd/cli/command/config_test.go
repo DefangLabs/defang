@@ -149,7 +149,7 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 		{
 			name:        "value given as a second arg instead of KEY=VALUE",
 			args:        []string{"config", "set", "KEY1", "s3cr3t-not-a-file", "--provider=defang", "--project-name=app"},
-			expectedErr: "the second argument is read as a file path, and it could not be read (no such file or directory); to set the value directly, use: defang config set KEY1=VALUE",
+			expectedErr: "expected the second argument to be a file containing the value, but couldn't read it (no such file or directory); to set the value directly, use: defang config set KEY1=VALUE",
 			secret:      "s3cr3t",
 		},
 		{

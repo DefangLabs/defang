@@ -143,7 +143,7 @@ var configSetCmd = &cobra.Command{
 				bytes, err = os.ReadFile(args[1])
 				// Don't echo the path: it's often a value typed in the wrong format, and errors are sent to telemetry.
 				if pathErr, ok := errors.AsType[*fs.PathError](err); ok {
-					return fmt.Errorf("the second argument is read as a file path, and it could not be read (%w); to set the value directly, use: defang config set %s=VALUE", pathErr.Err, name)
+					return fmt.Errorf("expected the second argument to be a file containing the value, but couldn't read it (%w); to set the value directly, use: defang config set %s=VALUE", pathErr.Err, name)
 				}
 			} else {
 				bytes, err = io.ReadAll(os.Stdin)
