@@ -39,7 +39,7 @@ defang stack list
 ## Step 5: Run the estimate
 
 ```bash
-defang compose estimate
+defang estimate
 ```
 
 Useful flags:
