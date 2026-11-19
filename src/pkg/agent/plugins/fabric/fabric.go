@@ -44,19 +44,28 @@ type EmbedderRef struct {
 }
 
 var (
+	chatModelSupports = &ai.ModelSupports{
+		Multiturn:  true,
+		Tools:      true,
+		ToolChoice: true,
+		SystemRole: true,
+		// Media:       true,
+		Constrained: ai.ConstrainedSupportNoTools,
+	}
+
 	supportedModels = map[string]ai.ModelOptions{
+		// Fabric maps "default" to its current model, so the CLI need not change when Fabric does.
+		"default": {
+			Label:    "Defang default",
+			Versions: []string{},
+			Supports: chatModelSupports,
+			Stage:    ai.ModelStageStable,
+		},
 		"google/gemini-3.5-flash": {
 			Label:    "Gemini 3.5 Flash",
 			Versions: []string{},
-			Supports: &ai.ModelSupports{
-				Multiturn:  true,
-				Tools:      true,
-				ToolChoice: true,
-				SystemRole: true,
-				// Media:       true,
-				Constrained: ai.ConstrainedSupportNoTools,
-			},
-			Stage: ai.ModelStageStable,
+			Supports: chatModelSupports,
+			Stage:    ai.ModelStageStable,
 		},
 	}
 
