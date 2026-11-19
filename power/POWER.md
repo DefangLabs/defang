@@ -11,7 +11,6 @@ keywords:
     "compose",
     "aws",
     "gcp",
-    "digitalocean",
     "estimate",
   ]
 mcpServers: ["defang"]
