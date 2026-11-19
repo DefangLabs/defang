@@ -141,6 +141,11 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 			args: []string{"config", "set", "KEY1=somevalue", "--provider=defang", "--project-name=app"},
 		},
 		{
+			name:        "value given as a second arg instead of KEY=VALUE",
+			args:        []string{"config", "set", "KEY1", "s3cr3t-not-a-file", "--provider=defang", "--project-name=app"},
+			expectedErr: "file not found; to set the value directly, use: defang config set KEY1=VALUE",
+		},
+		{
 			name: "valid use of KEY=VALUE format with multiple args",
 			args: []string{"config", "set", "KEY1=somevalue", "KEY2=anothervalue", "--provider=defang", "--project-name=app"},
 		},

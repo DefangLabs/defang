@@ -334,7 +334,7 @@ func SetupCommands(version string) {
 
 	origHelpFunc := RootCmd.HelpFunc()
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		track.Cmd(cmd, "Help", P("args", args))
+		track.Cmd(cmd, "Help")
 		origHelpFunc(cmd, args)
 	})
 }
@@ -400,9 +400,10 @@ var RootCmd = &cobra.Command{
 		ctx := cmd.Context()
 		term.SetDebug(global.Debug)
 
-		// Use "defer" to track any errors that occur during the command
+		// Use "defer" to track any errors that occur during the command.
+		// Never send positional args: they can hold secrets, e.g. `config set KEY=VALUE`.
 		defer func() {
-			track.Cmd(cmd, "Invoked", P("args", args), P("err", err), P("non-interactive", global.NonInteractive), P("provider", global.Stack.Provider))
+			track.Cmd(cmd, "Invoked", P("err", err), P("non-interactive", global.NonInteractive), P("provider", global.Stack.Provider))
 		}()
 
 		// Do this first, since any errors will be printed to the console

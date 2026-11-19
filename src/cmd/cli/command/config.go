@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -136,6 +137,10 @@ var configSetCmd = &cobra.Command{
 			var bytes []byte
 			if len(args) == 2 && args[1] != "-" {
 				bytes, err = os.ReadFile(args[1])
+				// Don't echo the path: it's often a value typed in the wrong format, and errors are sent to telemetry.
+				if errors.Is(err, fs.ErrNotExist) {
+					return fmt.Errorf("file not found; to set the value directly, use: defang config set %s=VALUE", name)
+				}
 			} else {
 				bytes, err = io.ReadAll(os.Stdin)
 			}
