@@ -4,7 +4,7 @@ Estimate the monthly cloud cost for the current project using the Defang CLI by 
 
 Run `defang --version` to confirm the CLI is installed. If it is not found, install it:
 
-- npm: `npm install -g @defang-io/defang`
+- npm: `npm install -g defang`
 - Homebrew: `brew install DefangLabs/defang/defang`
 - curl: `eval "$(curl -fsSL s.defang.io/install)"`
 

@@ -9,12 +9,12 @@
   "homepage": "https://defang.io",
   "repository": "https://github.com/DefangLabs/defang",
   "license": "Apache-2.0",
-  "keywords": ["deploy", "cloud", "aws", "gcp", "digitalocean", "docker", "compose"],
+  "keywords": ["deploy", "cloud", "aws", "gcp", "azure", "docker", "compose"],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Defang",
-    "shortDescription": "Deploy Docker Compose apps to AWS, GCP, or DigitalOcean.",
+    "shortDescription": "Deploy Docker Compose apps to AWS, Google Cloud or Azure.",
     "category": "Infrastructure"
   }
 }
