@@ -96,8 +96,8 @@ After installing, use `/defang:deploy` to guide you through deploying your proje
 
 ## Getting started
 
-- Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
-- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started) page
+- Read our [Getting Started](https://docs.defang.io/docs/intro/getting-started) page
+- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/intro/getting-started) page
 - Take a look at our [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them
 - Try the AI integration by running `defang generate`
 - Start your new service with `defang compose up`
