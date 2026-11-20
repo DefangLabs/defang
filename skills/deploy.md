@@ -85,7 +85,6 @@ Useful flags:
 
 - `-d` / `--detach`: return immediately without streaming logs
 - `--force`: force a fresh image build even if nothing changed
-- `--mode affordable|balanced|high_availability`: override the stack's deployment mode
 
 The CLI will stream logs automatically. If the deployment fails, Defang may offer an AI-assisted debug prompt — allow it to run before investigating manually.
 
