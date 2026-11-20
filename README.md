@@ -42,8 +42,8 @@ cli -.-> logs
 ```
 
 1. **You write** a standard Docker **Compose** file
-2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS/GCP account
-3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
+2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS, GCP or Azure account
+3. **CD runs in your cloud** — a deployment task spins up in your AWS, GCP or Azure account
 4. **Infrastructure is created** — containers, DNS, load balancing, and roles are provisioned
 5. **Monitor** the deployment and tail or query runtime logs with the Defang CLI
 
@@ -97,7 +97,7 @@ After installing, use `/defang:deploy` to guide you through deploying your proje
 ## Getting started
 
 - Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
-- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
+- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started) page
 - Take a look at our [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them
 - Try the AI integration by running `defang generate`
 - Start your new service with `defang compose up`

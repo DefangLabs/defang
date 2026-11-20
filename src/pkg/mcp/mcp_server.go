@@ -17,7 +17,7 @@ import (
 )
 
 func prepareInstructions() string {
-	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, GCP, Digital Ocean) using a compose.yaml file."
+	instructions := "Defang provides tools for deploying web applications to cloud providers (AWS, Google Cloud or Azure) using a compose.yaml file."
 	return instructions
 }
 
