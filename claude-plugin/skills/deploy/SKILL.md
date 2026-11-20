@@ -8,7 +8,7 @@ Deploy the current project using the Defang CLI by following these steps:
 
 Run `defang --version` to confirm the CLI is installed. If it is not found, install it:
 
-- npm: `npm install -g @defang-io/defang`
+- npm: `npm install -g defang`
 - Homebrew: `brew install DefangLabs/defang/defang`
 - curl: `eval "$(curl -fsSL s.defang.io/install)"`
 
@@ -44,7 +44,7 @@ defang stack new
 Required parameters:
 
 - **Name**: alphanumeric, cannot start with a number (e.g., `production`)
-- **Provider**: `aws`, `gcp`, or `digitalocean`
+- **Provider**: `aws`, `gcp`, or `azure`
 - **Region**: e.g., `us-east-1` (AWS), `us-central1` (GCP)
 - **Deployment Mode**: controls cost and resiliency
   - `affordable` — lowest cost, for dev/test (default)

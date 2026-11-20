@@ -5,13 +5,13 @@
     "email": "support@defang.io"
   },
   "metadata": {
-    "description": "Official Defang plugin for Claude Code — deploy Docker Compose apps to AWS, GCP, or DigitalOcean."
+    "description": "Official Defang plugin for Claude Code — deploy Docker Compose apps to AWS, Google Cloud or Azure."
   },
   "plugins": [
     {
       "name": "defang",
       "source": "./claude-plugin",
-      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes /defang:deploy, /defang:estimate, and /defang:debug skills and Defang MCP server integration.",
+      "description": "Deploy Docker Compose apps to your own cloud account using Defang. Includes a /defang:deploy skill and Defang MCP server integration.",
       "version": "1.0.0",
       "author": {
         "name": "DefangLabs"
@@ -25,7 +25,7 @@
         "cloud",
         "aws",
         "gcp",
-        "digitalocean",
+        "azure",
         "docker",
         "compose"
       ]
