@@ -1,6 +1,7 @@
 {
   "name": "defang",
   "version": "<PLACEHOLDER>",
+  "mcpName": "io.defang/defang",
   "author": "Defang Software Labs Inc.",
   "description": "CLI to take your app from Docker Compose to a secure and scalable deployment on your favorite cloud in minutes",
   "license": "MIT",
