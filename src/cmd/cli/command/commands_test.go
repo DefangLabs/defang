@@ -547,6 +547,24 @@ func TestErrIfStackAndProvider(t *testing.T) {
 	}
 }
 
+func TestProviderFlagDeprecated(t *testing.T) {
+	var out bytes.Buffer
+	origProvider := global.Stack.Provider
+	RootCmd.SetOut(&out)
+	t.Cleanup(func() {
+		RootCmd.SetOut(nil)
+		global.Stack.Provider = origProvider
+		RootCmd.Flag("provider").Changed = false
+	})
+
+	if err := RootCmd.ParseFlags([]string{"--provider", "aws"}); err != nil {
+		t.Fatalf("ParseFlags() failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "--provider has been deprecated") {
+		t.Errorf("expected a deprecation warning for --provider, got %q", out.String())
+	}
+}
+
 func TestFabricUnreachable(t *testing.T) {
 	t.Chdir("../../../../src/testdata/sanity")
 	t.Setenv("DEFANG_ACCESS_TOKEN", "token-123")

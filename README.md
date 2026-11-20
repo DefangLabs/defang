@@ -42,8 +42,8 @@ cli -.-> logs
 ```
 
 1. **You write** a standard Docker **Compose** file
-2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS/GCP account
-3. **CD runs in your cloud** — a deployment task spins up in your AWS/GCP account
+2. **Defang CLI** validates your Compose project and uploads the project to storage in your AWS, Google Cloud or Azure account
+3. **CD runs in your cloud** — a deployment task spins up in your AWS, Google Cloud or Azure account
 4. **Infrastructure is created** — containers, DNS, load balancing, and roles are provisioned
 5. **Monitor** the deployment and tail or query runtime logs with the Defang CLI
 
@@ -97,7 +97,7 @@ After installing, use `/defang:deploy` to guide you through deploying your proje
 ## Getting started
 
 - Read our [Getting Started](https://docs.defang.io/docs/getting-started) page
-- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/getting-started/installing) page
+- Follow the installation instructions from the [Installing](https://docs.defang.io/docs/intro/getting-started#install-the-defang-cli) page
 - Take a look at our [Samples](https://github.com/DefangLabs/samples) in Golang, Python, and Node.js that show how to accomplish various tasks and deploy them
 - Try the AI integration by running `defang generate`
 - Start your new service with `defang compose up`
@@ -239,7 +239,7 @@ The Defang CLI recognizes the following environment variables:
 - `DEFANG_MODEL_ID` - The model ID of the LLM to use for the generate/debug AI integration (Pro users only)
 - `DEFANG_NO_CACHE` - If set to `true`, disables pull-through caching of container images; defaults to `false`
 - `DEFANG_PREFIX` - The prefix to use for all BYOC resources; defaults to `Defang`
-- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `azure`, `digitalocean`, `gcp`, or `defang`
+- `DEFANG_PROVIDER` - The name of the cloud provider to use, `auto` (default), `aws`, `azure`, `digitalocean`, `gcp`, `scaleway`, or `defang`
 - `DEFANG_PULUMI_BACKEND` - The Pulumi backend URL or `"pulumi-cloud"`; defaults to a self-hosted backend
 - `DEFANG_PULUMI_DEBUG` - If set to `true`, enables debug logging for Pulumi operations; defaults to `false`
 - `DEFANG_PULUMI_DIFF` - If set to `true`, shows the Pulumi diff during deployments; defaults to `false`

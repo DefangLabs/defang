@@ -158,7 +158,7 @@ func SetupCommands(version string) {
 		return completions, cobra.ShellCompDirectiveNoFileComp
 	})
 	// RootCmd.Flag("provider").NoOptDefVal = "auto" NO this will break the "--provider aws"
-	RootCmd.Flags().MarkDeprecated("provider", "use '--stack' to select a stack instead")
+	RootCmd.PersistentFlags().MarkDeprecated("provider", "use '--stack' to select a stack instead")
 	RootCmd.PersistentFlags().BoolVarP(&global.Verbose, "verbose", "v", global.Verbose, "verbose logging") // backwards compat: only used by tail
 	RootCmd.PersistentFlags().BoolVar(&global.Debug, "debug", global.Debug, "debug logging for troubleshooting the CLI")
 	RootCmd.PersistentFlags().BoolVar(&dryrun.DoDryRun, "dry-run", false, "dry run (don't actually change anything)")
