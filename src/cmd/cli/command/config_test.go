@@ -34,6 +34,11 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 	if err := os.WriteFile(envFilePath, []byte("TEST_KEY=test_value\nANOTHER_KEY=another_value\nTHIRD_KEY=third_value\n"), 0644); err != nil {
 		t.Fatalf("failed to create test env file: %v", err)
 	}
+	badEnvFilePath := filepath.Join(tempDir, "bad.env")
+	if err := os.WriteFile(badEnvFilePath, []byte("MY-KEY=s3cr3t-in-file\nDB_PASSWORD=hunter2\n"), 0644); err != nil {
+		t.Fatalf("failed to create bad env file: %v", err)
+	}
+	longValue := strings.Repeat("s3cr3t", 50) // longer than a file name may be
 
 	userinfoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/userinfo" {
@@ -60,6 +65,7 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 		name        string
 		args        []string
 		expectedErr string
+		secret      string // must not appear in the error, which is sent to telemetry
 	}{
 		{
 			name:        "cannot use --random with --env",
@@ -141,6 +147,24 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 			args: []string{"config", "set", "KEY1=somevalue", "--provider=defang", "--project-name=app"},
 		},
 		{
+			name:        "value given as a second arg instead of KEY=VALUE",
+			args:        []string{"config", "set", "KEY1", "s3cr3t-not-a-file", "--provider=defang", "--project-name=app"},
+			expectedErr: "expected the second argument to be a file containing the value, but couldn't read it (no such file or directory); to set the value directly, use: defang config set KEY1=VALUE",
+			secret:      "s3cr3t",
+		},
+		{
+			name:        "long value given as a second arg instead of KEY=VALUE",
+			args:        []string{"config", "set", "KEY1", longValue, "--provider=defang", "--project-name=app"},
+			expectedErr: "to set the value directly, use: defang config set KEY1=VALUE",
+			secret:      "s3cr3t",
+		},
+		{
+			name:        "malformed env file",
+			args:        []string{"config", "set", "--env-file=" + badEnvFilePath, "--provider=defang", "--project-name=app"},
+			expectedErr: "failed to parse env file",
+			secret:      "s3cr3t",
+		},
+		{
 			name: "valid use of KEY=VALUE format with multiple args",
 			args: []string{"config", "set", "KEY1=somevalue", "KEY2=anothervalue", "--provider=defang", "--project-name=app"},
 		},
@@ -157,6 +181,9 @@ func TestConfigSetFlagConflicts(t *testing.T) {
 					t.Errorf("expected error but got none")
 				} else if !strings.Contains(err.Error(), tc.expectedErr) {
 					t.Errorf("expected error message to contain %q, got %q", tc.expectedErr, err.Error())
+				}
+				if tc.secret != "" && err != nil && strings.Contains(err.Error(), tc.secret) {
+					t.Errorf("error message leaks the value: %q", err.Error())
 				}
 			} else {
 				if err != nil {
