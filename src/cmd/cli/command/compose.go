@@ -329,7 +329,7 @@ func confirmDeploymentToNewLocation() (bool, error) {
 func promptToCreateStack(ctx context.Context, targetDirectory string, params stacks.Parameters) error {
 	if global.NonInteractive {
 		term.Info("Consider creating a stack to manage your deployments.")
-		printDefangHint("To create a stack, do:", "stack new --name="+params.Name)
+		printDefangHint("To create a stack, do:", "stack new "+params.Name)
 		return nil
 	}
 
