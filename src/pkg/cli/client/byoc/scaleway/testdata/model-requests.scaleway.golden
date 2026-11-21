@@ -1,0 +1,49 @@
+name: modeldemo
+services:
+  app:
+    environment:
+      CHAT_URL: https://proxy.example/v1/
+      EMBED_BASE_URL: https://api.scaleway.ai/v1/
+      OPENAI_API_KEY: null
+    image: app
+    models:
+      chat:
+        endpoint_var: CHAT_URL
+        model_var: CHAT_MODEL
+      embed:
+        endpoint_var: EMBED_BASE_URL
+        model_var: EMBED_MODEL_NAME
+    networks:
+      default: null
+  worker:
+    environment:
+      CHAT_URL: https://api.scaleway.ai/v1/
+      EXACT_URL: https://api.scaleway.ai/v1/
+      LARGE_MODEL: my-pinned-name
+      LARGE_URL: https://api.scaleway.ai/v1/
+      OPENAI_API_KEY: null
+    image: worker
+    models:
+      chat:
+        endpoint_var: CHAT_URL
+        model_var: WORKER_CHAT_MODEL
+      exact:
+        endpoint_var: EXACT_URL
+        model_var: EXACT_MODEL
+      large:
+        endpoint_var: LARGE_URL
+        model_var: LARGE_MODEL
+    networks:
+      default: null
+networks:
+  default:
+    name: modeldemo_default
+models:
+  chat:
+    model: ai/chat-default
+  embed:
+    model: embedding-default
+  exact:
+    model: us.amazon.nova-2-lite-v1:0
+  large:
+    model: chat-large

@@ -42,7 +42,8 @@ func HandleDeployTool(ctx context.Context, params DeployParams, cli CLIInterface
 			return "", fmt.Errorf("local deployment failed: %v. Please provide a valid compose file path.", err)
 		}
 
-		err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services))
+		// A model project always takes the current CD image (see compose.HasModels).
+		err = cli.CanIUseProvider(ctx, client, provider, project.Name, len(project.Services), compose.HasModels(project))
 		if err != nil {
 			return "", fmt.Errorf("failed to use provider: %w", err)
 		}

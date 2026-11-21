@@ -49,7 +49,7 @@ func HandleLogsTool(ctx context.Context, params LogsParams, cli CLIInterface, ec
 	}
 	term.Debug("Project name loaded:", projectName)
 
-	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0)
+	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}

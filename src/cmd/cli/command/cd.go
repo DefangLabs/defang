@@ -190,7 +190,8 @@ var cdPreviewCmd = &cobra.Command{
 		}
 
 		allowUpgrade, _ := cmd.Flags().GetBool("allow-upgrade")
-		err = canIUseProvider(ctx, session.Provider, project.Name, 1, allowUpgrade) // 1 SDU for BYOC preview
+		// A model project always takes the current CD image (see compose.HasModels).
+		err = canIUseProvider(ctx, session.Provider, project.Name, 1, allowUpgrade || compose.HasModels(project)) // 1 SDU for BYOC preview
 		if err != nil {
 			return err
 		}
