@@ -63,7 +63,7 @@ npx -y defang@latest mcp setup --client=vscode-insiders
 While this is not an IDE in the traditional sense, it can support MCP servers.
 
 ```bash
-npx -y defang@latest mcp setup --client=claude
+npx -y defang@latest mcp setup --client=claude-desktop
 ```
 
 ## MCP Tools
