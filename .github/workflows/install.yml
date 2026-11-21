@@ -15,6 +15,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # GoReleaser's `release.published` webhook fires as soon as the GitHub
+      # release object is created, which happens before all platform archives
+      # are uploaded (upload is a series of separate API calls after create).
+      # Without this, a release-triggered run can race ahead of go-release
+      # and see a release with no (or partial) assets yet.
+      - name: Wait for release assets to be uploaded
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${{ github.event.release.tag_name }}"
+          for i in $(seq 1 40); do
+            if gh release view "$tag" --repo "${{ github.repository }}" --json assets --jq '.assets[].name' 2>/dev/null | grep -q "_linux_amd64\.tar\.gz$"; then
+              echo "Release assets for $tag are available."
+              exit 0
+            fi
+            echo "Waiting for release assets to be uploaded for $tag (attempt $i/40)..."
+            sleep 15
+          done
+          echo "::error::Timed out waiting for release assets to be uploaded for $tag"
+          exit 1
+
       - name: Install defang (latest)
         run: eval "$(curl -fsSL s.defang.io/install)"
         env:
