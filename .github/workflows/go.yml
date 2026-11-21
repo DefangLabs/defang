@@ -704,6 +704,28 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+      - name: Publish to the MCP Registry
+        continue-on-error: true # the registry is in preview; don't fail the release
+        shell: bash
+        env:
+          MCP_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }} # read by mcp-publisher login
+        run: |
+          if [ -z "$MCP_PRIVATE_KEY" ]; then
+            echo "::notice::MCP_REGISTRY_PRIVATE_KEY is not set; skipping MCP Registry publish"
+            exit 0
+          fi
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/v1.8.10/mcp-publisher_linux_amd64.tar.gz" -o mcp-publisher.tar.gz
+          echo "32d287ed6fb7dc04eddd2621097784c06a355b2348b35ccc630a1643aa75ff4a  mcp-publisher.tar.gz" | sha256sum -c
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+          # server.json must carry the version that was just published to npm
+          VERSION="$(jq -r .version pkgs/npm/package.json)"
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.json.tmp
+          mv server.json.tmp server.json
+          # The registry checks mcpName on npm, which can take a moment to serve a new version
+          curl -fsS -o /dev/null --retry 6 --retry-delay 10 --retry-all-errors "https://registry.npmjs.org/defang/$VERSION"
+          ./mcp-publisher login http --domain defang.io
+          ./mcp-publisher publish
+
   on-failure:
     runs-on: ubuntu-latest
     if: always() && failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
