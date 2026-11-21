@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.defang/defang",
+  "title": "Defang Deploy",
+  "description": "Defang Deploy: deploy Compose apps to your own AWS, Google Cloud or Azure account.",
+  "websiteUrl": "https://defang.io",
+  "repository": {
+    "url": "https://github.com/DefangLabs/defang",
+    "source": "github"
+  },
+  "version": "<PLACEHOLDER>",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "defang",
+      "version": "<PLACEHOLDER>",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        { "type": "positional", "value": "mcp" },
+        { "type": "positional", "value": "serve" }
+      ]
+    }
+  ]
+}

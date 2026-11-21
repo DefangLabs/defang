@@ -704,6 +704,30 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+      # The MCP registry is in preview, so a failure here must not fail the release.
+      - name: Publish to the MCP registry
+        continue-on-error: true
+        shell: bash
+        env:
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+          MCP_PUBLISHER_VERSION: v1.8.9
+          MCP_PUBLISHER_SHA256: 4d527ca8f1ced0394c962dc925c2a4a4addef441cbefd62501c875e9481823a8
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$MCP_REGISTRY_PRIVATE_KEY" ]; then
+            echo "MCP_REGISTRY_PRIVATE_KEY is not set; skipping MCP registry publish."
+            exit 0
+          fi
+          VERSION="${RELEASE_TAG#v}"
+          jq --arg v "$VERSION" '.version = $v | .packages[0].version = $v' server.json > server.tmp
+          mv server.tmp server.json
+          archive=mcp-publisher_linux_amd64.tar.gz
+          curl -fsSLO "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${archive}"
+          echo "$MCP_PUBLISHER_SHA256  $archive" | sha256sum -c -
+          tar xzf "$archive" mcp-publisher
+          ./mcp-publisher login http --domain defang.io --private-key "$MCP_REGISTRY_PRIVATE_KEY"
+          ./mcp-publisher publish
+
   on-failure:
     runs-on: ubuntu-latest
     if: always() && failure() && (github.ref == 'refs/heads/main' || startsWith(github.ref,
