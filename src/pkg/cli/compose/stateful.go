@@ -32,7 +32,7 @@ var statefulImages = []string{
 }
 
 func isStatefulImage(image string) bool {
-	repo := strings.ToLower(strings.SplitN(image, ":", 2)[0])
+	repo := GetImageRepo(image)
 	for _, statefulImage := range statefulImages {
 		if strings.HasSuffix(repo, statefulImage) {
 			return true
