@@ -209,7 +209,7 @@ func (gcp Gcp) GetBuildStatus(ctx context.Context, startBuildOpName string) (boo
 	return false, nil
 }
 
-const pollBuildMaxAttempts = 3
+const pollBuildMaxAttempts = 5
 
 // pollBuildInitialWaitForTest is the initial backoff between poll retries.
 // Declared as a var so tests can shorten it.
