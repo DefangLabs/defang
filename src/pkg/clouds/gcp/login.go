@@ -131,7 +131,7 @@ func (gcp *Gcp) Authenticate(ctx context.Context, interactive bool) error {
 	} else if tokenSource != nil {
 		term.Debug("found GitHub Actions OIDC token source, testing permissions...")
 		if err := testTokenProjectPermissions(ctx, gcp.ProjectId, requiredPerms, tokenSource); err != nil {
-			term.Warnf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.com/defang-byoc/gcp/github-actions\n", gcp.ProjectId, err)
+			term.Warnf("GitHub Actions OIDC token is missing required permissions on project %q: %v\nPlease ensure your workload identity provider and github actions permissions are set up correctly: https://docs.defang.io/docs/tutorials/deploying-from-github-actions/to-gcp\n", gcp.ProjectId, err)
 		} else {
 			term.Debug("GitHub Actions OIDC token has required permissions")
 			tokenSource = wrapTokenSource(tokenSource)
