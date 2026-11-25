@@ -34,7 +34,8 @@ func TestValidationAndConvert(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
-		return configs.Names, nil
+		// A deployment creates the gateway key before it runs (ensureGatewayKey).
+		return append(configs.Names, gatewayKeyConfig), nil
 	}
 
 	testAllComposeFiles(t, func(t *testing.T, name, path string) {
