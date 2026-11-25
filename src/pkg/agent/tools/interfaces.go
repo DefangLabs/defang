@@ -13,7 +13,7 @@ import (
 )
 
 type CLIInterface interface {
-	CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error
+	CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error
 	ComposeDown(ctx context.Context, projectName string, fabric *client.GrpcClient, provider client.Provider) (string, error)
 	ComposeUp(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, stack *stacks.Parameters, params cli.ComposeUpParams) (*defangv1.DeployResponse, *compose.Project, error)
 	ConfigDelete(ctx context.Context, projectName string, provider client.Provider, name string) error

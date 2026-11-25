@@ -1,10 +1,12 @@
 package scaleway
 
 import (
-	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"testing"
 
+	"github.com/DefangLabs/defang/src/pkg"
 	"github.com/DefangLabs/defang/src/pkg/cli/compose"
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
@@ -21,69 +23,37 @@ func fixupTestProvider(t *testing.T) *ByocScaleway {
 	return provider
 }
 
-func TestScalewayFixupConsumesRemoteModelsBeforeSharedFixups(t *testing.T) {
-	for _, model := range []struct{ input, resolved string }{
-		{"chat-default", "qwen3-235b-a22b-instruct-2507"},
-		{"embedding-default", "bge-multilingual-gemma2"},
-		{"custom/model", "custom/model"},
-	} {
-		for _, topLevel := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/top-level=%v", model.input, topLevel), func(t *testing.T) {
-				content := `name: modeldemo
-services:
-  app:
-    image: python:3.12-alpine
-`
-				if topLevel {
-					content += fmt.Sprintf(`    models:
-      llm:
-        endpoint_var: MODEL_URL
-        model_var: MODEL_NAME
-models:
-  llm:
-    model: %s
-`, model.input)
-				} else {
-					content += fmt.Sprintf(`    depends_on:
-      - llm
-  llm:
-    provider:
-      type: model
-      options:
-        model: %s
-`, model.input)
-				}
-				project, err := compose.LoadFromContent(t.Context(), []byte(content), "")
-				require.NoError(t, err)
-				provider := fixupTestProvider(t)
-				require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
-				require.Len(t, project.Services, 1)
-				assert.Empty(t, project.Models)
-				app := project.Services["app"]
-				endpointKey, modelKey := "LLM_URL", "LLM_MODEL"
-				if topLevel {
-					endpointKey, modelKey = "MODEL_URL", "MODEL_NAME"
-				}
-				require.NotNil(t, app.Environment[endpointKey])
-				assert.Equal(t, "https://api.scaleway.ai/v1/", *app.Environment[endpointKey])
-				assert.Equal(t, model.resolved, *app.Environment[modelKey])
-				assert.Contains(t, app.Environment, "OPENAI_API_KEY")
-				assert.Nil(t, app.Environment["OPENAI_API_KEY"])
-				assert.Empty(t, app.Models)
-				assert.NotContains(t, app.DependsOn, "llm")
-				assert.NotContains(t, project.Networks, "model_provider_private")
+// The same application as the gateway clouds' payload tests in the compose package.
+const modelRequestsCompose = "../../../compose/testdata/model-requests/compose.yaml"
 
-				fixed, err := compose.MarshalYAML(project)
-				require.NoError(t, err)
-				_, err = compose.LoadFromContent(t.Context(), fixed, "")
-				require.NoError(t, err, "the deploy payload must have no orphan model references")
-				require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
-				again, err := compose.MarshalYAML(project)
-				require.NoError(t, err)
-				assert.Equal(t, string(fixed), string(again))
-			})
-		}
-	}
+func TestScalewayFixupModelRequestPayload(t *testing.T) {
+	project, err := compose.NewLoader(compose.WithPath(modelRequestsCompose)).LoadProject(t.Context())
+	require.NoError(t, err)
+	provider := fixupTestProvider(t)
+	require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
+	payload, err := compose.MarshalYAML(project)
+	require.NoError(t, err)
+	require.NoError(t, pkg.Compare(payload, "testdata/model-requests.scaleway.golden"))
+
+	reloaded, err := compose.LoadFromContent(t.Context(), payload, "")
+	require.NoError(t, err, "the deploy payload must have no orphan model references")
+	assert.Equal(t, []string{"app", "worker"}, slices.Sorted(maps.Keys(reloaded.Services)), "Generative APIs serve the models; no model service runs")
+	assert.Equal(t, []string{"chat", "embed", "exact", "large"}, slices.Sorted(maps.Keys(reloaded.Models)))
+	assert.NotContains(t, reloaded.Networks, "model_provider_private")
+	app := reloaded.Services["app"]
+	assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"], "explicit endpoint stays authoritative")
+	assert.Equal(t, generativeAPIsURL, *app.Environment["EMBED_BASE_URL"])
+	assert.NotContains(t, app.Environment, "EMBED_MODEL_NAME", "the CD engine writes the resolved model ID")
+	assert.Contains(t, app.Environment, "OPENAI_API_KEY")
+	assert.Nil(t, app.Environment["OPENAI_API_KEY"], "the API key is a Secret Manager reference")
+	assert.Empty(t, app.DependsOn)
+	assert.Equal(t, &composeTypes.ServiceModelConfig{EndpointVariable: "EMBED_BASE_URL", ModelVariable: "EMBED_MODEL_NAME"}, app.Models["embed"])
+	assert.True(t, usesScalewayLLM(reloaded))
+
+	require.NoError(t, compose.FixupServices(t.Context(), provider, project, compose.UploadModeIgnore))
+	again, err := compose.MarshalYAML(project)
+	require.NoError(t, err)
+	assert.Equal(t, string(payload), string(again), "fixing up again must not change the payload")
 }
 
 func TestScalewayFixupPreservesOverridesAndRequiresOnlyManagedRedisConfig(t *testing.T) {

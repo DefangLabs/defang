@@ -1,0 +1,310 @@
+package compose
+
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/DefangLabs/defang/src/pkg"
+	"github.com/DefangLabs/defang/src/pkg/cli/client"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type accountProvider struct {
+	client.MockProvider
+	info client.AccountInfo
+}
+
+func (p accountProvider) AccountInfo(context.Context) (*client.AccountInfo, error) {
+	return &p.info, nil
+}
+
+type defangMvpCDProvider struct {
+	accountProvider
+}
+
+func (defangMvpCDProvider) DefangMvpCD() bool { return true }
+
+type directProvider struct {
+	client.MockProvider
+}
+
+func (directProvider) DirectModelEndpoint() string { return "https://inference.example/v1/" }
+
+const modelRequestsCompose = "testdata/model-requests/compose.yaml"
+
+func loadModelRequests(t *testing.T) *Project {
+	t.Helper()
+	project, err := NewLoader(WithPath(modelRequestsCompose)).LoadProject(t.Context())
+	require.NoError(t, err)
+	return project
+}
+
+func binding(endpointVar, modelVar string) *composeTypes.ServiceModelConfig {
+	return &composeTypes.ServiceModelConfig{EndpointVariable: endpointVar, ModelVariable: modelVar}
+}
+
+// Requests stay in models:, and every consumer names both of its variables.
+var wantModelRequests = map[string]string{
+	"chat":  "ai/chat-default",
+	"embed": "embedding-default",
+	"exact": "us.amazon.nova-2-lite-v1:0",
+	"large": "chat-large",
+}
+
+var wantBindings = map[string]map[string]*composeTypes.ServiceModelConfig{
+	"app": {
+		"chat":  binding("CHAT_URL", "CHAT_MODEL"),
+		"embed": binding("EMBED_BASE_URL", "EMBED_MODEL_NAME"),
+	},
+	"worker": {
+		"chat":  binding("CHAT_URL", "WORKER_CHAT_MODEL"),
+		"exact": binding("EXACT_URL", "EXACT_MODEL"),
+		"large": binding("LARGE_URL", "LARGE_MODEL"),
+	},
+}
+
+func assertModelPayload(t *testing.T, project *Project) {
+	t.Helper()
+	requests := map[string]string{}
+	for name, model := range project.Models {
+		requests[name] = model.Model
+	}
+	assert.Equal(t, wantModelRequests, requests)
+	for consumer, want := range wantBindings {
+		assert.Equal(t, want, project.Services[consumer].Models, consumer)
+	}
+}
+
+// The payload is what the CD engine receives, so it is compared as a whole.
+func TestFixupModelRequestPayloads(t *testing.T) {
+	for _, info := range []client.AccountInfo{
+		{Provider: client.ProviderAWS, Region: "us-west-2", AccountID: "123456789012"},
+		{Provider: client.ProviderGCP, Region: "us-central1", AccountID: "my-project"},
+		{Provider: client.ProviderAzure, Region: "eastus", AccountID: "my-subscription"},
+	} {
+		t.Run(info.Provider.String(), func(t *testing.T) {
+			project := loadModelRequests(t)
+			require.NoError(t, FixupServices(t.Context(), accountProvider{info: info}, project, UploadModeIgnore))
+			payload, err := MarshalYAML(project)
+			require.NoError(t, err)
+			require.NoError(t, pkg.Compare(payload, modelRequestsCompose+"."+strings.ToLower(info.Provider.String())+".golden"))
+
+			reloaded, err := LoadFromContent(t.Context(), payload, "")
+			require.NoError(t, err)
+			assertModelPayload(t, reloaded)
+			for name := range wantModelRequests {
+				gateway := reloaded.Services[name]
+				assert.Equal(t, "litellm/litellm:v1.92.0", gateway.Image, name)
+				assert.Equal(t, true, gateway.Extensions["x-defang-llm"], name)
+				assert.Empty(t, gateway.Command, "%s: the CD engine owns the gateway routing", name)
+				assert.NotContains(t, gateway.Environment, "VERTEXAI_LOCATION", "%s: the location depends on the resolved model", name)
+			}
+			assert.Equal(t, "DEBUG", *reloaded.Services["large"].Environment["LITELLM_LOG"])
+
+			app, worker := reloaded.Services["app"], reloaded.Services["worker"]
+			assert.Equal(t, "chat-default", *app.Environment["CHAT_MODEL"], "the ai/ spelling of a built-in alias is normalized")
+			assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"], "explicit endpoint stays authoritative")
+			assert.Equal(t, "embedding-default", *app.Environment["EMBED_MODEL_NAME"])
+			assert.Equal(t, "chat-default", *worker.Environment["WORKER_CHAT_MODEL"])
+			assert.Equal(t, "us.amazon.nova-2-lite-v1:0", *worker.Environment["EXACT_MODEL"])
+			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"], "explicit model stays authoritative")
+		})
+	}
+}
+
+// A defang-mvp CD engine deploys the gateway command as written, so the payload
+// is the one the CLI sent before recipes, with the ai/ spellings normalized.
+func TestFixupDefangMvpCDModelRequests(t *testing.T) {
+	tests := []struct {
+		info     client.AccountInfo
+		commands map[string][]string
+		env      map[string]string // on every gateway
+		models   map[string]string // consumer variable -> routed model
+	}{
+		{
+			info: client.AccountInfo{Provider: client.ProviderAWS, Region: "us-west-2", AccountID: "123456789012"},
+			commands: map[string][]string{
+				"chat":  {"--drop_params", "--model", "bedrock/us.amazon.nova-2-lite-v1:0", "--alias", "chat-default"},
+				"embed": {"--drop_params", "--model", "bedrock/amazon.titan-embed-text-v2:0", "--alias", "embedding-default"},
+				"exact": {"--drop_params", "--model", "bedrock/us.amazon.nova-2-lite-v1:0", "--alias", "us.amazon.nova-2-lite-v1:0"},
+				"large": {"--drop_params", "--model", "bedrock/zai.glm-5", "--alias", "chat-large"},
+			},
+			env: map[string]string{"AWS_REGION": "us-west-2"},
+			models: map[string]string{
+				"CHAT_MODEL":        "bedrock/us.amazon.nova-2-lite-v1:0",
+				"EMBED_MODEL_NAME":  "bedrock/amazon.titan-embed-text-v2:0",
+				"WORKER_CHAT_MODEL": "bedrock/us.amazon.nova-2-lite-v1:0",
+				"EXACT_MODEL":       "bedrock/us.amazon.nova-2-lite-v1:0",
+			},
+		},
+		{
+			info: client.AccountInfo{Provider: client.ProviderGCP, Region: "us-central1", AccountID: "my-project"},
+			commands: map[string][]string{
+				"chat":  {"--drop_params", "--model", "vertex_ai/gemini-3.5-flash", "--alias", "chat-default"},
+				"embed": {"--drop_params", "--model", "vertex_ai/gemini-embedding-001", "--alias", "embedding-default"},
+				"exact": {"--drop_params", "--model", "vertex_ai/us.amazon.nova-2-lite-v1:0", "--alias", "us.amazon.nova-2-lite-v1:0"},
+				"large": {"--drop_params", "--model", "vertex_ai/gemini-3.1-pro-preview", "--alias", "chat-large"},
+			},
+			env: map[string]string{"VERTEXAI_PROJECT": "my-project"},
+			models: map[string]string{
+				"CHAT_MODEL":        "vertex_ai/gemini-3.5-flash",
+				"EMBED_MODEL_NAME":  "vertex_ai/gemini-embedding-001",
+				"WORKER_CHAT_MODEL": "vertex_ai/gemini-3.5-flash",
+				"EXACT_MODEL":       "vertex_ai/us.amazon.nova-2-lite-v1:0",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.info.Provider.String(), func(t *testing.T) {
+			project := loadModelRequests(t)
+			require.NoError(t, FixupServices(t.Context(), defangMvpCDProvider{accountProvider{info: tt.info}}, project, UploadModeIgnore))
+			payload, err := MarshalYAML(project)
+			require.NoError(t, err)
+			require.NoError(t, pkg.Compare(payload, modelRequestsCompose+"."+strings.ToLower(tt.info.Provider.String())+"-defang-mvp.golden"))
+
+			for name, want := range tt.commands {
+				gateway := project.Services[name]
+				assert.Equal(t, want, []string(gateway.Command), name)
+				for key, val := range tt.env {
+					assert.Equal(t, val, *gateway.Environment[key], "%s: %s", name, key)
+				}
+			}
+			if tt.info.Provider == client.ProviderGCP {
+				// The built-in chat models are served from the global Vertex location only.
+				assert.Equal(t, "global", *project.Services["chat"].Environment["VERTEXAI_LOCATION"])
+				assert.Equal(t, "us-central1", *project.Services["embed"].Environment["VERTEXAI_LOCATION"])
+			}
+			app, worker := project.Services["app"], project.Services["worker"]
+			for _, consumer := range []composeTypes.ServiceConfig{app, worker} {
+				for key, want := range tt.models {
+					if got, ok := consumer.Environment[key]; ok {
+						assert.Equal(t, want, *got, "%s: %s", consumer.Name, key)
+					}
+				}
+			}
+			assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"], "explicit model stays authoritative")
+			assert.Nil(t, app.Models["chat"], "the binding is left as written")
+		})
+	}
+}
+
+func TestFixupDirectModels(t *testing.T) {
+	project := loadModelRequests(t)
+	require.NoError(t, FixupServices(t.Context(), directProvider{}, project, UploadModeIgnore))
+
+	assertModelPayload(t, project)
+	for name := range wantModelRequests {
+		assert.NotContains(t, project.Services, name, "a provider-served model has no service")
+	}
+	assert.NotContains(t, project.Networks, modelProviderNetwork)
+	for _, name := range []string{"app", "worker"} {
+		consumer := project.Services[name]
+		assert.Empty(t, consumer.DependsOn, name)
+		assert.NotContains(t, consumer.Networks, modelProviderNetwork, name)
+		assert.Contains(t, consumer.Environment, "OPENAI_API_KEY", name)
+		assert.Nil(t, consumer.Environment["OPENAI_API_KEY"], "%s: the API key is a config reference", name)
+	}
+	app, worker := project.Services["app"], project.Services["worker"]
+	assert.Equal(t, "https://inference.example/v1/", *app.Environment["EMBED_BASE_URL"])
+	assert.Equal(t, "https://proxy.example/v1/", *app.Environment["CHAT_URL"])
+	for _, modelVar := range []string{"CHAT_MODEL", "EMBED_MODEL_NAME"} {
+		assert.NotContains(t, app.Environment, modelVar, "the CD engine writes the resolved model ID")
+	}
+	assert.Equal(t, "my-pinned-name", *worker.Environment["LARGE_MODEL"])
+
+	payload, err := MarshalYAML(project)
+	require.NoError(t, err)
+	_, err = LoadFromContent(t.Context(), payload, "")
+	require.NoError(t, err, "the payload must not reference a missing model or service")
+}
+
+func TestFixupModelRequestErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider client.Provider
+		compose  string
+		wantErr  string
+	}{
+		{
+			name:     "DigitalOcean has no managed models",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderDO}},
+			compose:  "models:\n  llm:\n    model: chat-default\n",
+			wantErr:  "managed models are not supported on DigitalOcean",
+		},
+		{
+			name:     "deprecated syntax without a model",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderAWS}},
+			compose:  "  llm:\n    provider:\n      type: model\n",
+			wantErr:  `service "llm": no model specified`,
+		},
+		{
+			name:     "model shadows a service",
+			provider: accountProvider{info: client.AccountInfo{Provider: client.ProviderAWS}},
+			compose:  "  chat:\n    image: chat\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
+			name:     "model shadows a service on a direct provider",
+			provider: directProvider{},
+			compose:  "  chat:\n    image: chat\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
+			name:     "model shadows a deprecated model service in the Playground",
+			provider: accountProvider{},
+			compose:  "  chat:\n    provider:\n      type: model\n      options:\n        model: chat-default\nmodels:\n  chat:\n    model: chat-default\n",
+			wantErr:  `model "chat": a service has the same name`,
+		},
+		{
+			name:     "top-level model without a model",
+			provider: directProvider{},
+			compose:  "models:\n  llm:\n    model: \"\"\n",
+			wantErr:  `model "llm": no model specified`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			project, err := LoadFromContent(t.Context(), []byte("name: demo\nservices:\n  app:\n    image: app\n"+tt.compose), "")
+			require.NoError(t, err)
+			assert.ErrorContains(t, FixupServices(t.Context(), tt.provider, project, UploadModeIgnore), tt.wantErr)
+		})
+	}
+}
+
+func TestApplicationModelName(t *testing.T) {
+	for model, want := range map[string]string{
+		"ai/chat-default":      "chat-default",
+		"ai/chat-large":        "chat-large",
+		"ai/embedding-default": "embedding-default",
+		"ai/smollm2":           "ai/smollm2",
+		"chat-default":         "chat-default",
+		"bedrock/ai/model":     "bedrock/ai/model",
+	} {
+		assert.Equal(t, want, applicationModelName(model), model)
+	}
+}
+
+func TestHasModels(t *testing.T) {
+	tests := []struct {
+		name    string
+		project composeTypes.Project
+		want    bool
+	}{
+		{name: "no models", project: composeTypes.Project{Services: composeTypes.Services{"app": {Name: "app", Image: "app"}}}},
+		{name: "top-level models", want: true, project: composeTypes.Project{Models: map[string]composeTypes.ModelConfig{"llm": {Model: "ai/chat-default"}}}},
+		{name: "deprecated provider service", want: true, project: composeTypes.Project{Services: composeTypes.Services{
+			"llm": {Name: "llm", Provider: &composeTypes.ServiceProviderConfig{Type: "model", Options: composeTypes.MultiOptions{"model": {"chat-default"}}}},
+		}}},
+		{name: "provider service with its own image", project: composeTypes.Project{Services: composeTypes.Services{
+			"llm": {Name: "llm", Image: "my/gateway", Provider: &composeTypes.ServiceProviderConfig{Type: "model"}},
+		}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, HasModels(&tt.project))
+		})
+	}
+}

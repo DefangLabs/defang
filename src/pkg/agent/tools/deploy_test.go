@@ -15,6 +15,7 @@ import (
 	"github.com/DefangLabs/defang/src/pkg/elicitations"
 	"github.com/DefangLabs/defang/src/pkg/stacks"
 	defangv1 "github.com/DefangLabs/defang/src/protos/io/defang/v1"
+	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,6 +48,7 @@ type MockDeployCLI struct {
 	UseRealLoader                bool
 	Client                       *client.GrpcClient
 	CallLog                      []string
+	CanIUseAllowUpgrade          bool
 }
 
 func (m *MockDeployCLI) Connect(ctx context.Context, fabricAddr string) (*client.GrpcClient, error) {
@@ -102,8 +104,9 @@ func (m *MockDeployCLI) ConfigSet(ctx context.Context, projectName string, provi
 	return nil
 }
 
-func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int) error {
+func (m *MockDeployCLI) CanIUseProvider(ctx context.Context, fabric *client.GrpcClient, provider client.Provider, projectName string, serviceCount int, allowUpgrade bool) error {
 	m.CallLog = append(m.CallLog, "CanIUseProvider")
+	m.CanIUseAllowUpgrade = allowUpgrade
 	return nil
 }
 
@@ -113,6 +116,7 @@ func TestHandleDeployTool(t *testing.T) {
 		setupMock            func(*MockDeployCLI)
 		expectedTextContains string
 		expectedError        string
+		wantAllowUpgrade     bool
 	}{
 		{
 			name: "load_project_error",
@@ -175,6 +179,23 @@ func TestHandleDeployTool(t *testing.T) {
 			},
 			expectedTextContains: "The deployment is not complete, but it has been started successfully",
 		},
+		{
+			name: "model_project_takes_current_cd",
+			setupMock: func(m *MockDeployCLI) {
+				m.Project = &compose.Project{
+					Name:   "test-project",
+					Models: map[string]composeTypes.ModelConfig{"llm": {Model: "ai/chat-default"}},
+				}
+				m.ComposeUpResponse = &defangv1.DeployResponse{
+					Etag: "test-etag",
+					Services: []*defangv1.ServiceInfo{
+						{Service: &defangv1.Service{Name: "web"}, PublicFqdn: "web.example.com", Status: "running"},
+					},
+				}
+			},
+			expectedTextContains: "The deployment is not complete, but it has been started successfully",
+			wantAllowUpgrade:     true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -219,6 +240,8 @@ func TestHandleDeployTool(t *testing.T) {
 					assert.Contains(t, result, tt.expectedTextContains)
 				}
 			}
+
+			assert.Equal(t, tt.wantAllowUpgrade, mockCLI.CanIUseAllowUpgrade, "only a model project may skip the pinned CD image")
 
 			// For successful cases, verify CLI methods were called in order
 			if tt.expectedError == "" && tt.name == "successful_deploy_defang_provider" {

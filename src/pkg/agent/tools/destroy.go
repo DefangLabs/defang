@@ -30,7 +30,7 @@ func HandleDestroyTool(ctx context.Context, params DestroyParams, cli CLIInterfa
 		return "", fmt.Errorf("failed to load project name: %w", err)
 	}
 
-	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0)
+	err = cli.CanIUseProvider(ctx, client, provider, projectName, 0, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to use provider: %w", err)
 	}
