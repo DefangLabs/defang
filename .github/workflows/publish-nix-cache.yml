@@ -6,6 +6,10 @@ name: Publish Nix binary cache
 # manual dispatch can target ONLY this job, never the rest of go.yml.
 on:
   workflow_call:
+    secrets:
+      CACHIX_AUTH_TOKEN:
+        description: The one secret this workflow reads
+        required: true
 
 permissions:
   contents: read # checkout only; this job never pushes back to the repo

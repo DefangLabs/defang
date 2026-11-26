@@ -15,4 +15,5 @@ permissions:
 jobs:
   publish-nix-cache:
     uses: ./.github/workflows/publish-nix-cache.yml
-    secrets: inherit
+    secrets:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
