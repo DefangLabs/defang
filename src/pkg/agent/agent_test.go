@@ -32,3 +32,35 @@ func TestPrepareSystemPrompt(t *testing.T) {
 	cwd, _ := os.Getwd()
 	assert.Contains(t, result, cwd)
 }
+
+func TestSelectModel(t *testing.T) {
+	tests := []struct {
+		name         string
+		googleAPIKey string
+		modelID      string
+		wantProvider string
+		wantModel    string
+	}{
+		{name: "fabric default", wantProvider: "fabric", wantModel: "default"},
+		{name: "fabric override", modelID: "google/gemini-3.5-flash", wantProvider: "fabric", wantModel: "google/gemini-3.5-flash"},
+		{name: "google api key", googleAPIKey: "key", wantProvider: "googleai", wantModel: "gemini-3.5-flash"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setOrUnsetenv(t, "GOOGLE_API_KEY", tt.googleAPIKey)
+			setOrUnsetenv(t, "DEFANG_MODEL_ID", tt.modelID)
+			provider, model := selectModel()
+			if provider != tt.wantProvider || model != tt.wantModel {
+				t.Errorf("selectModel() = %q, %q; want %q, %q", provider, model, tt.wantProvider, tt.wantModel)
+			}
+		})
+	}
+}
+
+func setOrUnsetenv(t *testing.T, key, value string) {
+	t.Helper()
+	t.Setenv(key, value) // restores the original value after the test
+	if value == "" {
+		os.Unsetenv(key)
+	}
+}

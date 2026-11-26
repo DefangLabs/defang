@@ -57,7 +57,6 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters, opts 
 	}
 
 	accessToken := client.GetExistingToken(fabricAddr)
-	aiProvider := "fabric"
 	var providerPlugin api.Plugin
 	addr := client.NormalizeHost(fabricAddr)
 	// Generate a random session ID prepended with timestamp for easier sorting
@@ -69,15 +68,10 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters, opts 
 			option.WithHeader("x-defang-llm-session-id", sessionID),
 		},
 	}
-	defaultModel := "default"
-
-	if os.Getenv("GOOGLE_API_KEY") != "" {
-		aiProvider = "googleai"
+	aiProvider, model := selectModel()
+	if aiProvider == "googleai" {
 		providerPlugin = &googlegenai.GoogleAI{}
-		defaultModel = "gemini-3.5-flash"
 	}
-
-	model := pkg.Getenv("DEFANG_MODEL_ID", defaultModel)
 
 	gk := genkit.Init(ctx,
 		genkit.WithDefaultModel(fmt.Sprintf("%s/%s", aiProvider, model)),
@@ -116,6 +110,15 @@ func New(ctx context.Context, fabricAddr string, stack *stacks.Parameters, opts 
 	}
 
 	return a, nil
+}
+
+// selectModel lets Fabric pick the model unless GOOGLE_API_KEY or DEFANG_MODEL_ID says otherwise.
+func selectModel() (provider, model string) {
+	provider, model = "fabric", "default"
+	if os.Getenv("GOOGLE_API_KEY") != "" {
+		provider, model = "googleai", "gemini-3.5-flash"
+	}
+	return provider, pkg.Getenv("DEFANG_MODEL_ID", model)
 }
 
 func (a *Agent) StartWithUserPrompt(ctx context.Context, userPrompt string) error {
