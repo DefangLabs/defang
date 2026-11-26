@@ -10,6 +10,9 @@ on:
       - ".github/workflows/install.yml"
       - "src/bin/install"
 
+permissions:
+  contents: read # the install script only reads this repository's releases
+
 jobs:
   install:
     runs-on: ubuntu-latest
